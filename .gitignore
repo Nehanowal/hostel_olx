@@ -1,1 +1,9 @@
-node_modules
+node_modules/
+**/dist/
+.env
+**/.env
+!**/.env.example
+server_side/data/
+server_side/uploads/
+test-results/
+.sites-runtime/
