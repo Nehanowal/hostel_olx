@@ -1,0 +1,17 @@
+{
+  "name": "hostel-olx",
+  "private": true,
+  "scripts": {
+    "setup": "npm --prefix server_side ci && npm --prefix client_side ci",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm --prefix client_side run build",
+    "start": "npm --prefix server_side start",
+    "test": "npm --prefix server_side test"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6"
+  }
+}
