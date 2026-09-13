@@ -20,6 +20,9 @@ import {
   Store,
   Check,
   AlertCircle,
+  Eye,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { api, money } from "./api";
 import {
@@ -30,69 +33,12 @@ import {
   Admin,
 } from "./features";
 import "./App.css";
+import Modal from "./Modal";
+import GoogleSignIn from "./GoogleSignIn";
+import { useListingActivity } from "./useListingActivity";
+import MostViewed from "./MostViewed";
 
 const icons = { Headphones, BookOpen, Lamp, Shirt, Bike, Package };
-export function Modal({ title, children, onClose, wide = false }) {
-  useEffect(() => {
-    const key = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", key);
-    const previous = document.activeElement;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", key);
-      document.body.style.overflow = "";
-      previous?.focus();
-    };
-  }, [onClose]);
-  return (
-    <div
-      className="modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={`modal ${wide ? "wide" : ""}`}
-        onKeyDown={(e) => {
-          if (e.key === "Tab") {
-            const nodes = [
-              ...e.currentTarget.querySelectorAll(
-                "button:not(:disabled),input:not(:disabled),select,textarea,a[href]",
-              ),
-            ];
-            const first = nodes[0],
-              last = nodes.at(-1);
-            if (e.shiftKey && document.activeElement === first) {
-              e.preventDefault();
-              last?.focus();
-            } else if (!e.shiftKey && document.activeElement === last) {
-              e.preventDefault();
-              first?.focus();
-            }
-          }
-        }}
-      >
-        <div className="modal-heading">
-          <h2>{title}</h2>
-          <button
-            autoFocus
-            className="icon-button"
-            aria-label="Close dialog"
-            onClick={onClose}
-          >
-            <X size={22} />
-          </button>
-        </div>
-        {children}
-      </section>
-    </div>
-  );
-}
 function SignIn({ config, onLogin }) {
   const [name, setName] = useState(""),
     [email, setEmail] = useState(""),
@@ -124,16 +70,16 @@ function SignIn({ config, onLogin }) {
   return (
     <div className="signin-layout">
       <section className="signin-story">
-        <span className="eyebrow">LESS SPENDING. MORE STUDENT LIFE.</span>
+        <span className="eyebrow">YOUR CAMPUS MARKETPLACE</span>
         <h1>
-          Good things.
+          Great finds.
           <br />
-          New beginnings.
+          Right on campus.
         </h1>
         <p>
-          Pass on what you no longer need.
+          Books, tech and everyday essentials.
           <br />
-          Find what makes your room feel like you.
+          Buy and sell with people on your campus.
         </p>
         <div className="story-tags">
           <span>
@@ -149,7 +95,7 @@ function SignIn({ config, onLogin }) {
         <div className="story-bottom">
           <span className="large-mark">h.</span>
           <p>
-            Pre-loved things.
+            Your everyday finds.
             <br />
             <strong>People on your campus.</strong>
           </p>
@@ -165,7 +111,7 @@ function SignIn({ config, onLogin }) {
           <MapPin size={16} />
           {config.university} · Sonipat
         </div>
-        <form onSubmit={submit}>
+        {config.googleOnly ? <GoogleSignIn clientId={config.googleClientId} onLogin={onLogin} /> : <form onSubmit={submit}>
           {!challenge ? (
             <>
               <label>
@@ -191,7 +137,7 @@ function SignIn({ config, onLogin }) {
                   placeholder={`you@${config.domain}`}
                 />
               </label>
-              <small>Only @{config.domain} addresses are accepted.</small>
+              <small>Use {(config.domains || [config.domain]).map(domain => `@${domain}`).join(" or ")}.</small>
             </>
           ) : (
             <>
@@ -254,11 +200,9 @@ function SignIn({ config, onLogin }) {
               Change email or request another code
             </button>
           )}
-        </form>
+        </form>}
         <p className="signin-note">
           <ShieldCheck size={17} /> Campus access. No public phone numbers.
-          <br />
-          Meet and pay directly with the seller.
         </p>
       </section>
     </div>
@@ -273,7 +217,7 @@ export default function App() {
   const [view, setView] = useState("browse"),
     [query, setQuery] = useState(""),
     [category, setCategory] = useState(""),
-    [sort, setSort] = useState("newest"),
+    [sort, setSort] = useState("recommended"),
     [condition, setCondition] = useState(""),
     [maxPrice, setMaxPrice] = useState(""),
     [filters, setFilters] = useState(false);
@@ -287,9 +231,32 @@ export default function App() {
   const [modal, setModal] = useState(null),
     [toast, setToast] = useState(""),
     [conversationId, setConversationId] = useState(null);
+  const grid = useListingActivity(items, user?.id, loading, !!modal);
   const close = useCallback(() => setModal(null), []);
   const notify = useCallback((message) => setToast(message), []);
   const reload = () => setRefresh((n) => n + 1);
+  useEffect(() => {
+    let active = true;
+    const refreshOnReturn = () => {
+      if (document.hidden) return;
+      api("/me").then(({ user: current }) => {
+        if (!active) return;
+        if (current?.id !== user?.id) {
+          setUser(current); setView("browse"); setItems([]); setTotal(0);
+          setHasMore(false); setPage(1); setQuery(""); setCategory("");
+          setCondition(""); setMaxPrice(""); setModal(null); setConversationId(null);
+        }
+        setRefresh(n => n + 1);
+      }).catch(() => {});
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
+  }, [user?.id]);
   useEffect(() => {
     Promise.all([api("/config"), api("/me")])
       .then(([c, m]) => {
@@ -341,6 +308,11 @@ export default function App() {
   }, [user, view, query, category, sort, condition, maxPrice, page, refresh]);
   function navigate(next) {
     setView(next);
+    setItems([]);
+    setTotal(0);
+    setHasMore(false);
+    setLoading(true);
+    setFilters(false);
     setPage(1);
     setCategory("");
     setQuery("");
@@ -460,11 +432,12 @@ export default function App() {
         </div>
       )}
       {!user ? (
-        <SignIn config={config} onLogin={setUser} />
+        <SignIn config={config} onLogin={(nextUser) => { navigate("browse"); setSort("recommended"); setConversationId(null); setUser(nextUser); }} />
       ) : (
         <main className="workspace">
           {view === "inbox" ? (
             <Inbox
+              key={`${user.id}-${conversationId || "inbox"}`}
               user={user}
               conversationId={conversationId}
               setConversationId={setConversationId}
@@ -483,14 +456,14 @@ export default function App() {
                   </div>
                   <h1>
                     {view === "browse"
-                      ? "A second home for good things."
+                      ? "Your campus. Your marketplace."
                       : view === "mine"
-                        ? "Your things. Their next chapter."
+                        ? "Your listings, all in one place."
                         : "Good finds, kept close."}
                   </h1>
                   <p>
                     {view === "browse"
-                      ? "Find what you need. Pass on what you don’t. All on campus."
+                      ? "Find what you need. Buy and sell with students on campus."
                       : view === "mine"
                         ? "Manage your listings and let buyers know what’s available."
                         : "A little collection of things you’ve got your eye on."}
@@ -505,6 +478,16 @@ export default function App() {
                   </span>
                 </div>
               </div>
+              {view === "browse" && (
+                <MostViewed
+                  key={user.id}
+                  userId={user.id}
+                  refresh={refresh}
+                  modalOpen={!!modal}
+                  onOpen={id => setModal({ type: "detail", id })}
+                  onCreate={() => setModal({ type: "create" })}
+                />
+              )}
               <div className="search-row">
                 <div className="search-box">
                   <Search size={21} />
@@ -608,21 +591,6 @@ export default function App() {
                   );
                 })}
               </div>
-              {view === "browse" && !query && !category && (
-                <div className="campus-strip">
-                  <div>
-                    <span className="strip-label">THE MOVE-OUT EDIT</span>
-                    <h2>Less clutter. More possibilities.</h2>
-                    <p>Your extra could be someone’s essential.</p>
-                  </div>
-                  <button onClick={() => setModal({ type: "create" })}>
-                    Give it a second life <ArrowUpRight size={19} />
-                  </button>
-                  <span className="strip-number" aria-hidden="true">
-                    02<span>nd</span>
-                  </span>
-                </div>
-              )}
               <div className="results-heading">
                 <h2>
                   {query
@@ -645,11 +613,17 @@ export default function App() {
                       setPage(1);
                     }}
                   >
+                    <option value="recommended">Fresh + popular</option>
+                    <option value="popular">Most viewed</option>
                     <option value="newest">Newest first</option>
                     <option value="price-low">Price: low to high</option>
                     <option value="price-high">Price: high to low</option>
                   </select>
                 </label>
+              </div>
+              <div className="feed-context">
+                <p>{view === "mine" ? "Available listings are visible to every approved course. Sold and unavailable items are hidden from Explore." : view === "browse" && sort === "recommended" ? "New in the last 48 hours first. Then the finds getting the most attention." : sort === "popular" ? "Ranked by impressions. A visible card counts once per student per day." : "One campus marketplace, across all approved courses."}</p>
+                <button className="text-button" onClick={reload} disabled={loading}><RefreshCw size={15} /> Refresh</button>
               </div>
               {error ? (
                 <div className="empty">
@@ -667,9 +641,9 @@ export default function App() {
                   ))}
                 </div>
               ) : items.length ? (
-                <div className="listing-grid">
-                  {items.map((item) => (
-                    <article className="listing-card" key={item.id}>
+                <div className="listing-grid" ref={grid}>
+                  {items.map((item, index) => (
+                    <article className="listing-card" key={item.id} data-listing-id={item.id} data-count-impression={!item.isOwner && !item.is_demo && item.status === "active"} style={{ "--reveal-delay": `${Math.min(index % 4, 3) * 55}ms` }}>
                       <div className="card-image">
                         <button
                           className="image-link"
@@ -706,6 +680,10 @@ export default function App() {
                         )}
                       </div>
                       <div className="card-body">
+                        {!item.is_demo && <div className="listing-signals">
+                          {item.is_fresh ? <span className="fresh-label"><Sparkles size={12} /> Just dropped</span> : <span>{item.isOwner && item.status !== "active" ? "Hidden from Explore" : "Campus find"}</span>}
+                          <span title="Card impressions, once per student per day"><Eye size={13} /> {item.impressions || 0}</span>
+                        </div>}
                         <div className="card-price">
                           {money(item.price)}
                           <span>{item.category}</span>
@@ -727,6 +705,10 @@ export default function App() {
                             {item.isOwner ? "Your listing" : item.seller_name}
                           </span>
                         </div>
+                        {item.isOwner && item.status === "unavailable" && <button className="restore-listing" onClick={async () => {
+                          try { await api(`/listings/${item.id}/status`, { method: "PATCH", body: { status: "active", version: item.version } }); reload(); notify("Available again — all courses can now find this item."); }
+                          catch (e) { notify(e.message); }
+                        }}>Make visible on campus <ArrowUpRight size={15} /></button>}
                       </div>
                     </article>
                   ))}
@@ -777,8 +759,6 @@ export default function App() {
               )}
               <footer>
                 <span className="footer-brand">hostelolx</span>
-                <p>Good for your pocket. Better for the planet.</p>
-                <span>Meet on campus. Pay the seller directly.</span>
               </footer>
             </>
           )}
@@ -794,17 +774,18 @@ export default function App() {
               {user.university} · {user.campus}
             </p>
             <div className="notice">
-              {config.devAuth
+              {user.authMethod === "local"
                 ? "Local test account — email ownership has not been verified."
-                : "University email verified."}
+                : user.authMethod === "google" ? "Official university Google account verified." : "University email verified."}
             </div>
             <button
               className="secondary full"
               onClick={async () => {
-                await api("/auth/logout", { method: "POST" });
-                setUser(null);
-                close();
-                navigate("browse");
+                try {
+                  await api("/auth/logout", { method: "POST" });
+                  window.google?.accounts?.id?.disableAutoSelect();
+                  setUser(null); setConversationId(null); setSort("recommended"); close(); navigate("browse");
+                } catch (e) { notify(e.message); }
               }}
             >
               <LogOut size={17} />
@@ -815,10 +796,11 @@ export default function App() {
       )}
       {(modal?.type === "create" || modal?.type === "edit") && (
         <Modal
+          key={modal.type}
           title={
             modal.type === "edit"
               ? "Edit your listing"
-              : "Make room for something new."
+              : "List an item"
           }
           wide
           onClose={close}
@@ -827,15 +809,15 @@ export default function App() {
             config={config}
             item={modal.item}
             onSave={(item) => {
-              reload();
+              navigate(item.status === "active" ? "browse" : "mine"); setSort("recommended"); reload();
               setModal({ type: "detail", id: item.id });
-              notify("Your listing is ready!");
+              notify(item.status === "active" ? "Published — students across all approved courses can see your listing." : "Updated. Make this item available to show it in Explore.");
             }}
           />
         </Modal>
       )}
       {modal?.type === "detail" && (
-        <Modal title="A closer look" wide onClose={close}>
+        <Modal key={`detail-${modal.id}`} title="A closer look" wide onClose={() => { close(); reload(); }}>
           <ListingDetail
             id={modal.id}
             notify={notify}

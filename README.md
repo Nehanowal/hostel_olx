@@ -1,6 +1,19 @@
 # Hostel OLX
 
-A working, local-first student marketplace for **Rishihood University**, restricted to **@nst.rishihood.edu.in**. Built on the repository's React + Vite frontend and Express backend. All runtime libraries are free; local development needs no paid account, hosted database, API key, or credit card.
+A working, local-first student marketplace for **Rishihood University**, accepting **@nst.rishihood.edu.in**, **@csds.rishihood.edu.in**, **@psy.rishihood.edu.in**, **@makers.rishihood.edu.in**, and **@rishihood.edu.in**. All five domains share one university marketplace. Built on the repository's React + Vite frontend and Express backend. All runtime libraries are free; local development needs no paid account, hosted database, API key, or credit card.
+
+## Latest improvements
+
+- Scroll reveals, card hover effects, button feedback, animated dialog opening/closing, image lightbox with zoom and keyboard controls, and reduced-motion support.
+- **Most viewed on campus** sits above the main feed: a horizontal carousel of up to 12 available student listings, ranked by impressions (newest first on ties), with one-card arrow navigation, touch scrolling and keyboard access. It ranks the whole campus inventory independently of search, filters and feed pagination; samples and suspended sellers are excluded. Open any card for full details, photos and seller chat. The main feed still promotes new uploads.
+- Default **Fresh + popular** sorting: real uploads from the last 48 hours first (newest first), then older listings by cumulative impressions; samples follow real listings. **Most viewed**, **Newest first**, and price sorting remain available.
+- Impressions count when a card is at least 50% visible for one continuous second in a visible tab. Owner views and sample listings do not count. The database deduplicates each student/listing/day; repeat refreshes do not inflate that day's count. Rankings update when the feed reloads, without moving cards while you browse. These are impressions, not lifetime unique people or purchase counts.
+- Visibility explanations and direct reactivation in **My listings**, confirmation before hiding an item, filter reset on publishing/account changes, and refresh on returning to the page.
+- Official Google Identity Services button and server verification, Google-only mode, exact email and hosted-domain checks, one-use nonces, and preservation of existing account inventory.
+
+**[Exact Google setup, database status, and launch steps](docs/GOOGLE-AND-DATABASE-SETUP.md).** Google is configured in the local private `.env`, and a real university sign-in has been verified in Chrome at http://localhost:3002. Other environments need their own client configuration.
+
+This project was restored from the earlier MVP into `/Users/nehasharma/hostel_olx`, together with a consistent database snapshot and photos. The old output folder is a separate copy; use this folder going forward.
 
 ## Run it
 
@@ -11,7 +24,7 @@ npm run setup
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. API runs at **http://127.0.0.1:3001**. Keep the terminal running. Stop both with Ctrl+C. Frontend changes refresh automatically; restart after backend changes.
+Open **http://localhost:5173** (use localhost for Google). API runs at **http://127.0.0.1:3001**. Keep the terminal running. Stop both with Ctrl+C. Frontend changes refresh automatically; restart after backend changes.
 
 For a compiled frontend served by Express:
 
@@ -24,7 +37,7 @@ Then open **http://127.0.0.1:3001**. This is still a local preview unless produc
 
 ## Try the complete journey
 
-1. Enter any local test name and an address ending in `@nst.rishihood.edu.in`.
+1. Enter any local test name and an address ending in `@nst.rishihood.edu.in` or `@rishihood.edu.in`.
 2. In **local test mode**, use the clearly labelled on-screen code. No email is sent, and this is not proof of email ownership.
 3. Browse the six labelled sample listings, search, filter, sort, save, and inspect details. Sample sellers cannot receive messages.
 4. Click **Sell an item**. Add category details, a real photo, price, description, and campus pickup spot; preview and publish.
@@ -52,7 +65,7 @@ Then open **http://127.0.0.1:3001**. This is still a local preview unless produc
 | Backend        | Express 5, Node.js                                                    |
 | Database       | SQLite through Node's built-in `node:sqlite`                          |
 | Validation     | Zod                                                                   |
-| Authentication | Email OTP + opaque server sessions; Nodemailer SMTP adapter           |
+| Authentication | Google Identity Services + opaque server sessions; optional legacy email OTP/SMTP           |
 | Photos         | Multer + Sharp; protected local files                                 |
 | Chat           | Durable REST API with 3-second active-thread / 5-second inbox polling |
 | Tests          | Node test runner, real HTTP requests and isolated SQLite database     |
@@ -63,24 +76,20 @@ The earlier Next.js/PostgreSQL/Supabase plan is a future hosted option, not the 
 
 Copy `server_side/.env.example` to `server_side/.env` only if changing defaults. Never commit `.env` or credentials.
 
+`UNIVERSITY_DOMAINS` is a comma-separated exact allowlist (defaults to all five approved domains). It replaces the old singular `UNIVERSITY_DOMAIN` setting. Subdomains and lookalike suffixes are not automatically accepted.
+
 - Database: `server_side/data/marketplace.sqlite` (plus SQLite WAL files while running).
 - Photos: `server_side/uploads/`.
 - Both are ignored by Git and persist across application restarts. Back up both together while the server is stopped, or use SQLite's backup API for online backups.
 - Sample inventory is seeded only into an empty listing database in development. `SEED_DEMO=false` prevents future seeding; it does not delete existing records. Production discovery excludes sample inventory.
 - There is no default administrator. Set `ADMIN_EMAILS` to one or more approved institutional addresses, restart, and sign in with that account to see **Reports**. No role can be granted from the browser.
-- `DATABASE_PATH` can select an isolated database for testing or deployment. Relative paths resolve from the backend working directory; absolute paths are recommended.
+- `UPLOADS_PATH` can select a persistent photo directory. `DATABASE_PATH` can select an isolated database for testing or deployment. Relative paths resolve from the backend working directory; absolute paths are recommended.
 
-## Real email and a public student launch
+## Google authentication and a public student launch
 
-The delivered app is a working **local MVP**, not an already hosted public service. Set up these items before inviting real students:
+See [the setup guide](docs/GOOGLE-AND-DATABASE-SETUP.md) for exact Google console steps and environment values. Setting `GOOGLE_CLIENT_ID` automatically requires Google login and rejects OTP and local-test sessions. Without a client ID, the original local test login remains available; real email OTP can alternatively be enabled with `DEV_AUTH=false` and SMTP configuration.
 
-1. Configure an SMTP account using `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM`. An existing free email account with supported SMTP/app-password access may be sufficient for a small pilot; its limits and university delivery must be verified. Do not paste credentials into Git or chat.
-2. Set `DEV_AUTH=false`. New sessions require a code delivered to the institutional inbox; existing local-test sessions are rejected.
-3. For internet deployment, set `NODE_ENV=production`, `APP_ORIGIN` to the exact HTTPS origin, and `HOST` to the appropriate listening interface. Production refuses to start with test auth or missing SMTP/HTTPS configuration.
-4. Use a fresh production database and upload directory. Select hosting with a **persistent disk** and a verified ₹0 plan, or a university-provided server. Ephemeral/serverless file systems will lose SQLite data and photos. No provider account has been created or paid deployment provisioned.
-5. Assign a moderation owner, review campus rules/privacy/retention, and add admin MFA before wider rollout. The current admin gate is a server-side email allowlist with university OTP, not MFA.
-
-Free software does not imply unlimited free hosting, email, disk space, or traffic. This release guarantees no subscription dependency for running locally; a public hosting arrangement remains to be selected.
+For production, set `NODE_ENV=production`, an HTTPS `APP_ORIGIN`, and real Google authentication (or real SMTP with test auth disabled). Production refuses an unsafe startup. The app is a local MVP; no public hosting account, persistent hosted disk, HTTPS domain or backup service has been provisioned. SQLite and uploaded photos require persistent disk on one backend shared by all students.
 
 ## Tests
 
@@ -89,11 +98,11 @@ npm test
 npm run build
 ```
 
-Integration coverage includes anonymous/wrong-domain access, CSRF origin rejection, upload decoding and ownership, category attribute validation, cross-user edits, cross-university isolation, search, favorites, unique conversations, message retry/read state, sold-item behavior, durable storage, blocking, reports, admin actions, session revocation, and unsafe production configuration.
+Integration coverage includes anonymous/wrong-domain access, CSRF origin rejection, upload decoding and ownership, category attribute validation, cross-user edits, cross-university isolation, search, favorites, unique conversations, message retry/read state, sold-item behavior, durable storage, blocking, reports, admin actions, session revocation, and unsafe production configuration. Added tests cover all five domains after seller logout, impressions and ranking, reactivation, Google signature/issuer/audience/expiry validation, Workspace restrictions, nonce replay, account linking, local-session rejection and Google-only production without SMTP.
 
 ## Deliberately deferred
 
-Password login, Google/Microsoft SSO, annual re-verification, campus administration, multiple institutions in the UI, durable drafts, dedicated full-text search, realtime WebSockets, push/email message notifications, chat attachments, reviews, payments, background image cleanup, account deletion/export, appeals and advanced moderator evidence tools.
+Password login, Microsoft SSO, annual re-verification, campus administration, multiple institutions in the UI, durable drafts, dedicated full-text search, realtime WebSockets, push/email message notifications, chat attachments, reviews, payments, background image cleanup, account deletion/export, appeals and advanced moderator evidence tools.
 
 This is a single-process campus pilot. SQLite, in-memory rate limits and polling are suitable for local validation; use shared rate-limit storage, managed persistence/object storage and realtime delivery before horizontally scaling.
 

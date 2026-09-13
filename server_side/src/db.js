@@ -24,5 +24,8 @@ export function openDatabase(
       "ALTER TABLE sessions ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'local'",
     );
   }
+  if (!db.prepare("PRAGMA table_info(listings)").all().some(column => column.name === "impressions")) {
+    db.exec("ALTER TABLE listings ADD COLUMN impressions INTEGER NOT NULL DEFAULT 0 CHECK(impressions >= 0)");
+  }
   return db;
 }

@@ -68,3 +68,13 @@ CREATE TABLE IF NOT EXISTS admin_actions (
  action TEXT NOT NULL, reason TEXT NOT NULL,
  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
+CREATE TABLE IF NOT EXISTS google_identities (
+ subject TEXT PRIMARY KEY, user_id TEXT UNIQUE NOT NULL REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS google_challenges (
+ nonce_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS listing_impressions (
+ listing_id TEXT NOT NULL REFERENCES listings(id), viewer_id TEXT NOT NULL REFERENCES users(id),
+ day TEXT NOT NULL, PRIMARY KEY(listing_id,viewer_id,day)
+);

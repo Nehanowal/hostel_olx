@@ -10,13 +10,39 @@ import {
   ArrowRight,
   Send,
   ShieldCheck,
-  Package,
   Trash2,
   Pencil,
   Check,
   Ban,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { api, money } from "./api";
+import Modal from "./Modal";
+
+function PhotoViewer({ images, title, initialIndex, onClose }) {
+  const [index, setIndex] = useState(initialIndex);
+  const [zoom, setZoom] = useState(false);
+  function move(step) { setIndex(i => (i + step + images.length) % images.length); setZoom(false); }
+  return <Modal title={title} onClose={onClose} photo>
+    <div className="photo-viewer" onKeyDown={e => {
+      if (e.key === "ArrowRight") { e.preventDefault(); move(1); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); move(-1); }
+    }}>
+      <div className={`photo-stage ${zoom ? "zoomed" : ""}`}>
+        <button onClick={() => setZoom(v => !v)} aria-label={zoom ? "Zoom out of photo" : "Zoom into photo"}>
+          <img key={images[index].id} src={images[index].url} alt={`${title}, photo ${index + 1}`} />
+        </button>
+      </div>
+      <div className="photo-controls">
+        <button className="icon-button" disabled={images.length < 2} onClick={() => move(-1)} aria-label="Previous photo"><ArrowLeft /></button>
+        <span aria-live="polite">{index + 1} / {images.length}</span>
+        <button className="icon-button" onClick={() => setZoom(v => !v)} aria-label={zoom ? "Zoom out" : "Zoom in"}>{zoom ? <ZoomOut /> : <ZoomIn />}</button>
+        <button className="icon-button" disabled={images.length < 2} onClick={() => move(1)} aria-label="Next photo"><ArrowRight /></button>
+      </div>
+    </div>
+  </Modal>;
+}
 
 export function ListingDetail({
   id,
@@ -31,6 +57,16 @@ export function ListingDetail({
     [index, setIndex] = useState(0),
     [busy, setBusy] = useState(false),
     [confirm, setConfirm] = useState("");
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const soldButton = useRef(null);
+  const cancelSaleButton = useRef(null);
+  useEffect(() => {
+    if (confirm !== "sold") return;
+    cancelSaleButton.current?.focus({ preventScroll: true });
+    // Keep both choices visible even when the original button is near the
+    // bottom of the dialog's viewport. No manual scrolling is needed.
+    cancelSaleButton.current?.parentElement.scrollIntoView({ block: "nearest" });
+  }, [confirm]);
   useEffect(() => {
     let alive = true;
     api(`/listings/${id}`)
@@ -92,7 +128,10 @@ export function ListingDetail({
       <div className="detail-grid">
         <div>
           <div className="detail-image">
-            <img src={item.images[index]?.url} alt={item.title} />
+            <button className="detail-photo-button" onClick={() => setPhotoOpen(true)} aria-label={`Enlarge photo of ${item.title}`}>
+              <img key={item.images[index]?.id} src={item.images[index]?.url} alt={item.title} />
+              <span><ZoomIn size={16} /> Take a closer look</span>
+            </button>
             {item.is_demo && <span className="demo-label">SAMPLE LISTING</span>}
           </div>
           <div className="thumbnails">
@@ -117,6 +156,9 @@ export function ListingDetail({
           <span className={`status-pill ${item.status}`}>
             {item.status === "active" ? "Available on campus" : item.status}
           </span>
+          {item.isOwner && <p className={`visibility-note ${item.status === "active" ? "visible" : ""}`}>
+            {item.status === "active" ? "Visible to students across all approved courses." : item.status === "unavailable" ? "Hidden from Explore. Make it available again below so other students can find it." : "Sold items are hidden from Explore. Your conversation history is still available."}
+          </p>}
           <p className="location">
             <MapPin size={16} />
             {item.location} · Sonipat
@@ -136,24 +178,44 @@ export function ListingDetail({
                     <Pencil size={16} />
                     Edit listing
                   </button>
-                  <button
-                    className="secondary"
-                    disabled={busy}
-                    onClick={() => setConfirm("sold")}
-                  >
-                    <Check size={16} />
-                    Mark as sold
-                  </button>
+                  {confirm === "sold" ? (
+                    <div className="confirm-box sale-confirmation" role="group" aria-labelledby="sale-confirmation-title">
+                      <strong id="sale-confirmation-title">Mark this item as sold?</strong>
+                      <div>
+                        <button
+                          ref={cancelSaleButton}
+                          className="secondary"
+                          disabled={busy}
+                          onClick={() => {
+                            setConfirm("");
+                            setError("");
+                            requestAnimationFrame(() => soldButton.current?.focus({ preventScroll: true }));
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button className="primary" disabled={busy} onClick={() => changeStatus("sold")}>
+                          {busy ? "Updating…" : "Yes, mark as sold"}
+                        </button>
+                      </div>
+                      <p>It will leave Explore. Existing conversations will stay available.</p>
+                      {error && <p className="error" role="alert">{error}</p>}
+                    </div>
+                  ) : (
+                    <button
+                      ref={soldButton}
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() => { setError(""); setConfirm("sold"); }}
+                    >
+                      <Check size={16} />
+                      Mark as sold
+                    </button>
+                  )}
                   <button
                     className="text-button"
                     disabled={busy}
-                    onClick={() =>
-                      changeStatus(
-                        item.status === "unavailable"
-                          ? "active"
-                          : "unavailable",
-                      )
-                    }
+                    onClick={() => item.status === "unavailable" ? changeStatus("active") : setConfirm("unavailable")}
                   >
                     {item.status === "unavailable"
                       ? "Make available again"
@@ -196,6 +258,7 @@ export function ListingDetail({
           </p>
         </div>
       </div>
+      {photoOpen && <PhotoViewer images={item.images} title={item.title} initialIndex={index} onClose={() => setPhotoOpen(false)} />}
       <div className="description">
         <h3>About this find</h3>
         <p>{item.description}</p>
@@ -219,16 +282,14 @@ export function ListingDetail({
           </button>
         </div>
       </div>
-      {confirm && (
+      {confirm && confirm !== "sold" && (
         <div className="confirm-box">
           <strong>
-            {confirm === "sold"
-              ? "Mark this item as sold?"
+            {confirm === "unavailable" ? "Hide this item from Explore?"
               : "Delete this listing?"}
           </strong>
           <p>
-            {confirm === "sold"
-              ? "It will leave discovery. Existing conversations will stay available."
+            {confirm === "unavailable" ? "Other students will no longer find it in Explore. You can make it available again from My listings."
               : "It will disappear from discovery. Conversation history will be kept."}
           </p>
           <div>
@@ -245,7 +306,7 @@ export function ListingDetail({
           </div>
         </div>
       )}
-      {error && (
+      {error && confirm !== "sold" && (
         <p className="error" role="alert">
           {error}
         </p>
@@ -599,10 +660,6 @@ export function Inbox({
     if (!conversationId) return;
     let alive = true;
     lastRead.current = 0;
-    setData(null);
-    setOlder([]);
-    setDraft("");
-    setConfirmBlock(false);
     retry.current = null;
     const load = async () => {
       try {

@@ -53,10 +53,10 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
       headers: response.headers,
     };
   }
-  async function login(name) {
+  async function login(name, emailDomain = domain) {
     const challenge = await request("/auth/request", {
       method: "POST",
-      body: { name, email: `${name.toLowerCase()}@${domain}` },
+      body: { name, email: `${name.toLowerCase()}@${emailDomain}` },
     });
     assert.equal(challenge.status, 200, JSON.stringify(challenge.body));
     const signed = await request("/auth/verify", {
@@ -104,10 +104,18 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
     },
   );
   const seller = await login("Seller"),
-    buyer = await login("Buyer"),
+    buyer = await login("Buyer", "RISHIHOOD.EDU.IN"),
     stranger = await login("Stranger"),
     moderator = await login("Moderator");
   let photo, listing, chat;
+  await t.test("approved email domains share one university; exact domain checks reject lookalikes", async () => {
+    assert.equal(buyer.body.user.email, "buyer@rishihood.edu.in");
+    assert.equal(seller.body.user.university, buyer.body.user.university);
+    assert.deepEqual((await request('/config')).body.domains, ['nst.rishihood.edu.in', 'csds.rishihood.edu.in', 'psy.rishihood.edu.in', 'makers.rishihood.edu.in', 'rishihood.edu.in']);
+    for (const email of ['x@rishihood.edu.in.attacker.com', 'x@fake.rishihood.edu.in', 'x@notrishihood.edu.in']) {
+      assert.equal((await request('/auth/request', {method:'POST',body:{name:'Nope',email}})).status,422);
+    }
+  });
   await t.test(
     "validate and normalize an uploaded photo; enforce ownership",
     async () => {

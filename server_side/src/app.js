@@ -18,6 +18,7 @@ import { unlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { openDatabase, root } from "./db.js";
 import { categories, conditions, seedDemo } from "./catalog.js";
+import { googleAuth } from "./google-auth.js";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -42,24 +43,30 @@ export function createApp(options = {}) {
   const db = options.db || openDatabase();
   const production =
     options.production ?? process.env.NODE_ENV === "production";
-  const devAuth =
-    options.devAuth ?? (!production && process.env.DEV_AUTH !== "false");
-  const domain = (
-    process.env.UNIVERSITY_DOMAIN || "nst.rishihood.edu.in"
-  ).toLowerCase();
+  const googleClientId = options.googleClientId ?? process.env.GOOGLE_CLIENT_ID ?? "";
+  const googleOnly = !!googleClientId;
+  const devAuth = !googleOnly &&
+    (options.devAuth ?? (!production && process.env.DEV_AUTH !== "false"));
+  const domains = [...new Set(
+    (process.env.UNIVERSITY_DOMAINS || "nst.rishihood.edu.in,csds.rishihood.edu.in,psy.rishihood.edu.in,makers.rishihood.edu.in,rishihood.edu.in")
+      .split(",").map(value => value.trim().toLowerCase()).filter(Boolean),
+  )];
+  if (!domains.length) throw new Error("Configure at least one university email domain.");
+  const domain = domains[0];
   const university = process.env.UNIVERSITY_NAME || "Rishihood University";
+  const hostedDomains = (process.env.GOOGLE_HOSTED_DOMAINS || domains.join(","))
+    .split(",").map(value => value.trim().toLowerCase()).filter(Boolean);
   const origin = process.env.APP_ORIGIN || "http://localhost:5173";
-  const uploads = options.uploads || resolve(root, "uploads");
+  const uploads = options.uploads || process.env.UPLOADS_PATH || resolve(root, "uploads");
   mkdirSync(uploads, { recursive: true });
   if (
     production &&
     (devAuth ||
-      !process.env.SMTP_HOST ||
-      !process.env.SMTP_FROM ||
+      (!googleOnly && (!process.env.SMTP_HOST || !process.env.SMTP_FROM)) ||
       !process.env.APP_ORIGIN?.startsWith("https://"))
   ) {
     throw new Error(
-      "Production requires DEV_AUTH=false, SMTP_HOST, SMTP_FROM and an HTTPS APP_ORIGIN.",
+      "Production requires real authentication (GOOGLE_CLIENT_ID or DEV_AUTH=false with SMTP_HOST/SMTP_FROM) and an HTTPS APP_ORIGIN.",
     );
   }
   const adminEmails = (process.env.ADMIN_EMAILS || "")
@@ -92,6 +99,7 @@ export function createApp(options = {}) {
     email: user.email,
     university: user.university,
     campus: user.campus,
+    authMethod: user.auth_method,
     isAdmin: adminEmails.includes(user.email),
   });
   const run = (sql, ...args) => db.prepare(sql).run(...args);
@@ -113,6 +121,10 @@ export function createApp(options = {}) {
     helmet({
       contentSecurityPolicy: {
         directives: {
+          "script-src": ["'self'", "https://accounts.google.com/gsi/client"],
+          "frame-src": ["'self'", "https://accounts.google.com/gsi/"],
+          "connect-src": ["'self'", "https://accounts.google.com/gsi/"],
+          "style-src": ["'self'", "'unsafe-inline'", "https://accounts.google.com/gsi/style"],
           "img-src": [
             "'self'",
             "blob:",
@@ -123,6 +135,8 @@ export function createApp(options = {}) {
         },
       },
       strictTransportSecurity: production,
+      crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     }),
   );
   app.use(express.json({ limit: "50kb" }), cookieParser());
@@ -160,13 +174,15 @@ export function createApp(options = {}) {
     const token = req.cookies.session;
     req.user = token
       ? get(
-          "SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.status=? AND (?=0 OR s.auth_method='email')",
+          "SELECT u.*,s.auth_method FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.status=? AND (?=0 OR s.auth_method IN ('email','google')) AND (?=0 OR s.auth_method='google')",
           hash(token),
           Date.now(),
           "active",
           devAuth ? 0 : 1,
+          googleOnly ? 1 : 0,
         )
       : null;
+    if (req.user && !domains.includes(req.user.email.split("@")[1])) req.user = null;
     next();
   });
   const auth = (req, res, next) =>
@@ -191,6 +207,18 @@ export function createApp(options = {}) {
     legacyHeaders: false,
     message: { error: "Please slow down and try again shortly." },
   });
+  function issueSession(req, res, user, authMethod) {
+    const token = randomBytes(32).toString("hex");
+    run("DELETE FROM sessions WHERE expires_at<? OR token_hash=?", Date.now(), hash(req.cookies.session || ""));
+    run("UPDATE users SET verified_at=? WHERE id=?", new Date().toISOString(), user.id);
+    run("INSERT INTO sessions(token_hash,user_id,expires_at,auth_method) VALUES (?,?,?,?)",
+      hash(token), user.id, Date.now() + 7 * 86400000, authMethod);
+    res.cookie("session", token, {
+      httpOnly: true, secure: production, sameSite: "lax", maxAge: 7 * 86400000, path: "/",
+    });
+    res.json({ user: userDto({ ...user, auth_method: authMethod }) });
+  }
+  googleAuth({ app, db, clientId: googleClientId, domains, hostedDomains, university, production, authLimit, issueSession, client: options.googleClient });
   const lookup = (id, user) => {
     const row = get(
       "SELECT l.*,u.name AS seller_name,u.status AS seller_status FROM listings l JOIN users u ON u.id=l.seller_id WHERE l.id=? AND l.university=?",
@@ -210,6 +238,7 @@ export function createApp(options = {}) {
     ...row,
     attributes: JSON.parse(row.attributes),
     is_demo: !!row.is_demo,
+    is_fresh: row.status === "active" && Date.parse(row.created_at) >= Date.now() - 48 * 3600000,
     images: all(
       "SELECT id,path FROM images WHERE listing_id=? ORDER BY position,id",
       row.id,
@@ -246,12 +275,13 @@ export function createApp(options = {}) {
 
   app.get("/api/health", (req, res) => res.json({ ok: true }));
   app.get("/api/config", (req, res) =>
-    res.json({ university, domain, devAuth, categories, conditions }),
+    res.json({ university, domain, domains, devAuth, googleClientId, googleOnly, categories, conditions }),
   );
   app.get("/api/me", (req, res) =>
     res.json({ user: req.user ? userDto(req.user) : null }),
   );
   app.post("/api/auth/request", authLimit, async (req, res) => {
+    if (googleOnly) throw fail(403, "Use Google sign-in with your official university account.");
     const { email, name } = z
       .object({
         email: z
@@ -261,8 +291,8 @@ export function createApp(options = {}) {
         name: text(2, 60),
       })
       .parse(req.body);
-    if (email.split("@")[1] !== domain)
-      throw fail(422, `Use your @${domain} student email.`);
+    if (!domains.includes(email.split("@")[1]))
+      throw fail(422, `Use your ${domains.map(value => `@${value}`).join(" or ")} university email.`);
     if (email.startsWith("demo-"))
       throw fail(
         422,
@@ -316,12 +346,14 @@ export function createApp(options = {}) {
     });
   });
   app.post("/api/auth/verify", authLimit, (req, res) => {
+    if (googleOnly) throw fail(403, "Use Google sign-in with your official university account.");
     const { challengeId, code } = z
       .object({ challengeId: z.uuid(), code: z.string().regex(/^\d{6}$/) })
       .parse(req.body);
     const c = get("SELECT * FROM challenges WHERE id=?", challengeId);
     if (!c || c.expires_at < Date.now() || c.attempts >= 5)
       throw fail(400, "Code expired or too many attempts. Request a new code.");
+    if (!domains.includes(c.email.split("@")[1])) throw fail(403, "This university domain is no longer allowed.");
     run("UPDATE challenges SET attempts=attempts+1 WHERE id=?", challengeId);
     if (
       !timingSafeEqual(
@@ -344,28 +376,7 @@ export function createApp(options = {}) {
     });
     if (user.status !== "active")
       throw fail(403, "Your account is suspended. Contact the administrator.");
-    const token = randomBytes(32).toString("hex");
-    run("DELETE FROM sessions WHERE expires_at<?", Date.now());
-    run(
-      "UPDATE users SET verified_at=? WHERE id=?",
-      new Date().toISOString(),
-      user.id,
-    );
-    run(
-      "INSERT INTO sessions(token_hash,user_id,expires_at,auth_method) VALUES (?,?,?,?)",
-      hash(token),
-      user.id,
-      Date.now() + 7 * 86400000,
-      devAuth ? "local" : "email",
-    );
-    res.cookie("session", token, {
-      httpOnly: true,
-      secure: production,
-      sameSite: "lax",
-      maxAge: 7 * 86400000,
-      path: "/",
-    });
-    res.json({ user: userDto(user) });
+    issueSession(req, res, user, devAuth ? "local" : "email");
   });
   app.post("/api/auth/logout", (req, res) => {
     if (req.cookies.session)
@@ -378,7 +389,7 @@ export function createApp(options = {}) {
         q: text(0, 100).optional(),
         category: z.string().optional(),
         condition: z.string().optional(),
-        sort: z.enum(["newest", "price-low", "price-high"]).default("newest"),
+        sort: z.enum(["recommended", "popular", "newest", "price-low", "price-high"]).default("recommended"),
         view: z.enum(["browse", "saved", "mine"]).default("browse"),
         maxPrice: z.coerce.number().min(0).optional(),
         page: z.coerce.number().int().min(1).max(10000).default(1),
@@ -418,13 +429,17 @@ export function createApp(options = {}) {
     const base = `FROM listings l JOIN users u ON u.id=l.seller_id WHERE ${where.join(" AND ")}`;
     const total = get(`SELECT count(*) AS total ${base}`, ...args).total;
     const sort = {
+      recommended: "l.is_demo ASC,CASE WHEN l.created_at>=? THEN 0 ELSE 1 END ASC,CASE WHEN l.created_at>=? THEN l.created_at END DESC,l.impressions DESC,l.created_at DESC,l.id DESC",
+      popular: "l.impressions DESC,l.created_at DESC,l.id DESC",
       newest: "l.created_at DESC,l.id DESC",
       "price-low": "l.price ASC,l.id DESC",
       "price-high": "l.price DESC,l.id DESC",
     }[q.sort];
+    const freshSince = new Date(Date.now() - 48 * 3600000).toISOString();
     const rows = all(
       `SELECT l.*,u.name AS seller_name ${base} ORDER BY ${sort} LIMIT 24 OFFSET ?`,
       ...args,
+      ...(q.sort === "recommended" ? [freshSince, freshSince] : []),
       (q.page - 1) * 24,
     );
     res.json({
@@ -433,6 +448,33 @@ export function createApp(options = {}) {
       page: q.page,
       hasMore: q.page * 24 < total,
     });
+  });
+  app.post("/api/listings/impressions", auth, (req, res) => {
+    const { ids } = z.object({ ids: z.array(z.uuid()).min(1).max(24) }).parse(req.body);
+    const day = new Date().toISOString().slice(0, 10);
+    transaction(() => {
+      for (const id of new Set(ids)) {
+        const row = get("SELECT id FROM listings WHERE id=? AND university=? AND seller_id<>? AND status='active' AND is_demo=0 AND EXISTS(SELECT 1 FROM users WHERE users.id=listings.seller_id AND users.status='active')",
+          id, req.user.university, req.user.id);
+        if (!row) continue;
+        const inserted = run("INSERT OR IGNORE INTO listing_impressions(listing_id,viewer_id,day) VALUES (?,?,?)", id, req.user.id, day);
+        if (inserted.changes) run("UPDATE listings SET impressions=impressions+1 WHERE id=?", id);
+      }
+      // Only today's deduplication keys are needed; cumulative totals stay durable.
+      run("DELETE FROM listing_impressions WHERE day<?", day);
+    });
+    res.json({ ok: true });
+  });
+  app.get("/api/listings/most-viewed", auth, (req, res) => {
+    // This row ranks the entire campus inventory independently of the paginated
+    // feed and its filters. Samples never compete with real student listings.
+    const rows = all(
+      `SELECT l.*,u.name AS seller_name FROM listings l JOIN users u ON u.id=l.seller_id
+       WHERE l.university=? AND l.status='active' AND l.is_demo=0 AND u.status='active'
+       ORDER BY l.impressions DESC,l.created_at DESC,l.id DESC LIMIT 12`,
+      req.user.university,
+    );
+    res.json({ items: rows.map(row => listingDto(row, req.user)) });
   });
   app.get("/api/listings/:id", auth, (req, res) =>
     res.json(listingDto(lookup(req.params.id, req.user), req.user)),

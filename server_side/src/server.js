@@ -4,6 +4,7 @@ const host = process.env.HOST || "127.0.0.1";
 if (
   process.env.NODE_ENV !== "production" &&
   process.env.DEV_AUTH !== "false" &&
+  !process.env.GOOGLE_CLIENT_ID &&
   !["localhost", "127.0.0.1", "::1"].includes(host)
 )
   throw new Error("Local test authentication may only bind to loopback.");
