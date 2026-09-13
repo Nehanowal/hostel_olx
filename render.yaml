@@ -1,0 +1,45 @@
+# Dashboard: New > Blueprint > select this repository. Choose Free.
+# Enter the requested secrets there; never put their real values in this file.
+services:
+  - type: web
+    name: hostel-olx-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: server_side
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DEV_AUTH
+        value: "false"
+      - key: SEED_DEMO
+        value: "false"
+      - key: APP_ORIGIN
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: API_PROXY_SECRET
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: UNIVERSITY_NAME
+        value: Rishihood University
+      - key: UNIVERSITY_DOMAINS
+        value: nst.rishihood.edu.in,csds.rishihood.edu.in,psy.rishihood.edu.in,makers.rishihood.edu.in,rishihood.edu.in
+      - key: GOOGLE_HOSTED_DOMAINS
+        value: nst.rishihood.edu.in,csds.rishihood.edu.in,psy.rishihood.edu.in,makers.rishihood.edu.in,rishihood.edu.in

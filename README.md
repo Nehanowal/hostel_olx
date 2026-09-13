@@ -17,7 +17,7 @@ This project was restored from the earlier MVP into `/Users/nehasharma/hostel_ol
 
 ## Run it
 
-Requires Node.js **22.13+** (Node 24 LTS recommended) and npm.
+Requires Node.js **24 LTS** and npm (see `.nvmrc`).
 
 ```sh
 npm run setup
@@ -63,14 +63,14 @@ Then open **http://127.0.0.1:3001**. This is still a local preview unless produc
 | -------------- | --------------------------------------------------------------------- |
 | Frontend       | React 19, Vite, CSS, Lucide icons                                     |
 | Backend        | Express 5, Node.js                                                    |
-| Database       | SQLite through Node's built-in `node:sqlite`                          |
+| Database       | SQLite locally / Turso Cloud via `@libsql/client`                          |
 | Validation     | Zod                                                                   |
 | Authentication | Google Identity Services + opaque server sessions; optional legacy email OTP/SMTP           |
 | Photos         | Multer + Sharp; protected local files                                 |
 | Chat           | Durable REST API with 3-second active-thread / 5-second inbox polling |
 | Tests          | Node test runner, real HTTP requests and isolated SQLite database     |
 
-The earlier Next.js/PostgreSQL/Supabase plan is a future hosted option, not the implementation in this repository. Reusing the existing starter and SQLite makes this version runnable for ₹0 without service credentials. No Socket.IO, paid search, cloud storage account, payment processing or AI dependency is required.
+The deployment configuration uses Vercel for the frontend, Render for the backend, Turso for durable SQLite-compatible data, and Cloudinary for photos. Local development still works without cloud credentials. See the **[step-by-step deployment guide](docs/DEPLOYMENT.md)**.
 
 ## Data and configuration
 
@@ -89,7 +89,7 @@ Copy `server_side/.env.example` to `server_side/.env` only if changing defaults.
 
 See [the setup guide](docs/GOOGLE-AND-DATABASE-SETUP.md) for exact Google console steps and environment values. Setting `GOOGLE_CLIENT_ID` automatically requires Google login and rejects OTP and local-test sessions. Without a client ID, the original local test login remains available; real email OTP can alternatively be enabled with `DEV_AUTH=false` and SMTP configuration.
 
-For production, set `NODE_ENV=production`, an HTTPS `APP_ORIGIN`, and real Google authentication (or real SMTP with test auth disabled). Production refuses an unsafe startup. The app is a local MVP; no public hosting account, persistent hosted disk, HTTPS domain or backup service has been provisioned. SQLite and uploaded photos require persistent disk on one backend shared by all students.
+For the configured free-tier deployment, follow **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. Render uses Turso and authenticated Cloudinary storage, Google sign-in, production mode, and the exact Vercel origin. The Vercel API proxy preserves same-origin session cookies. Missing cloud credentials cause startup to fail on Render instead of storing student data on its temporary filesystem. Provider accounts and live services still need to be configured in their dashboards.
 
 ## Tests
 
@@ -104,7 +104,7 @@ Integration coverage includes anonymous/wrong-domain access, CSRF origin rejecti
 
 Password login, Microsoft SSO, annual re-verification, campus administration, multiple institutions in the UI, durable drafts, dedicated full-text search, realtime WebSockets, push/email message notifications, chat attachments, reviews, payments, background image cleanup, account deletion/export, appeals and advanced moderator evidence tools.
 
-This is a single-process campus pilot. SQLite, in-memory rate limits and polling are suitable for local validation; use shared rate-limit storage, managed persistence/object storage and realtime delivery before horizontally scaling.
+This is a single-process campus pilot with in-memory rate limits and polling. The hosted configuration uses durable Turso/Cloudinary storage. Add shared rate-limit storage and review polling/database load before horizontally scaling.
 
 ## Photo credits
 

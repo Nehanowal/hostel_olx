@@ -6,17 +6,20 @@ export const categories = [
   { id: "Sports", icon: "Bike", fields: ["Sport", "Size"] },
   { id: "Other", icon: "Package", fields: [] },
 ];
+
 export const conditions = ["Like new", "Good", "Fair", "New"];
-export function seedDemo(db, university, domain) {
-  if (db.prepare("SELECT 1 FROM listings LIMIT 1").get()) return;
+export async function seedDemo(db, university, domain) {
+  if (await db.prepare("SELECT 1 FROM listings LIMIT 1").get()) return;
   const now = new Date().toISOString();
   for (const [id, name] of [
     ["demo-aanya", "Aanya S."],
     ["demo-arjun", "Arjun K."],
   ]) {
-    db.prepare(
-      "INSERT OR IGNORE INTO users (id,email,name,university,verified_at) VALUES (?,?,?,?,?)",
-    ).run(id, `${id}@${domain}`, name, university, now);
+    await db
+      .prepare(
+        "INSERT OR IGNORE INTO users (id,email,name,university,verified_at) VALUES (?,?,?,?,?)",
+      )
+      .run(id, `${id}@${domain}`, name, university, now);
   }
   const items = [
     [
@@ -29,6 +32,7 @@ export function seedDemo(db, university, domain) {
       "1612858250298-8cbd5f65e6e8",
       "Comfortable headphones for long study sessions. Includes the original cable.",
     ],
+
     [
       "desk-lamp",
       "A little light for late nights",
@@ -39,6 +43,7 @@ export function seedDemo(db, university, domain) {
       "1582737068506-19cfa00233ee",
       "Adjustable study lamp. Works perfectly and fits even a small hostel desk.",
     ],
+
     [
       "semester-books",
       "Your next semester, sorted",
@@ -49,6 +54,7 @@ export function seedDemo(db, university, domain) {
       "1520467795206-62e33627e6ce",
       "A bundle of pre-loved reading. Check the titles with the seller before arranging pickup.",
     ],
+
     [
       "everyday-backpack",
       "The everyday campus backpack",
@@ -59,6 +65,7 @@ export function seedDemo(db, university, domain) {
       "1622560257067-108402fcedc0",
       "Spacious everyday backpack with comfortable straps and room for your essentials.",
     ],
+
     [
       "casual-sneakers",
       "Grey sneakers · size 8",
@@ -69,6 +76,7 @@ export function seedDemo(db, university, domain) {
       "1577982787983-e07c6730f2d3",
       "Gently used sneakers. Cleaned and ready for a second home. Try them on at pickup.",
     ],
+
     [
       "study-chair",
       "An upgrade for your study corner",
@@ -80,15 +88,17 @@ export function seedDemo(db, university, domain) {
       "Simple, comfortable chair. Selling before moving out. Campus pickup only.",
     ],
   ];
-  items.forEach(
-    (
-      [id, title, price, category, condition, location, photo, description],
-      i,
-    ) => {
-      const seller = i % 2 ? "demo-arjun" : "demo-aanya";
-      db.prepare(
+
+  for (const [
+    i,
+    [id, title, price, category, condition, location, photo, description],
+  ] of items.entries()) {
+    const seller = i % 2 ? "demo-arjun" : "demo-aanya";
+    await db
+      .prepare(
         "INSERT INTO listings (id,seller_id,university,title,description,category,price,condition,location,is_demo) VALUES (?,?,?,?,?,?,?,?,?,1)",
-      ).run(
+      )
+      .run(
         id,
         seller,
         university,
@@ -99,15 +109,16 @@ export function seedDemo(db, university, domain) {
         condition,
         location,
       );
-      db.prepare(
+    await db
+      .prepare(
         "INSERT INTO images (id,owner_id,listing_id,path,created_at) VALUES (?,?,?,?,?)",
-      ).run(
+      )
+      .run(
         `photo-${id}`,
         seller,
         id,
         `https://images.unsplash.com/photo-${photo}?auto=format&fit=crop&w=900&q=80`,
         Date.now(),
       );
-    },
-  );
+  }
 }

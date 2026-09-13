@@ -14,11 +14,12 @@ export async function api(path, options = {}) {
         : JSON.stringify(options.body)
       : undefined,
   });
-  const data = await response
-    .json()
-    .catch(() => ({ error: "The server is unavailable. Please try again." }));
-  if (!response.ok)
-    throw new Error(data.error || "Something went wrong. Please try again.");
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data === null)
+    throw new Error(
+      data?.error ||
+        "The marketplace is unavailable or waking up. Wait a minute and try again.",
+    );
   return data;
 }
 export const money = (value) =>

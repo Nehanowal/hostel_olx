@@ -93,26 +93,8 @@ The recovered snapshot had **two sold and two unavailable real listings, and no 
 
 No database password, Supabase project, Firebase project or database signup is required locally. To back up, stop the backend and copy the entire `server_side/data` and `server_side/uploads` directories together to your backup location. Do not copy just a live `.sqlite` file while its WAL contains pending writes. Keep backups private.
 
-## 5. What is still needed for a public launch
+## 5. Deploy to Vercel and Render
 
-Provide the intended website domain and your hosting choice (or details of a university-provided server). The current architecture needs one Node process, persistent disk storage for both database and uploads, HTTPS, and backups. A separate backend/database per student or an ephemeral filesystem would not provide a shared durable marketplace.
+The project now supports **Vercel + Render Free + Turso Cloud + Cloudinary Free**. Follow **[the deployment guide](DEPLOYMENT.md)** for account creation, environment variables, Google origins and verification.
 
-On that host, install dependencies with `npm run setup`, build with `npm run build`, then run `npm start`. Configure:
-
-```dotenv
-NODE_ENV=production
-DEV_AUTH=false
-SEED_DEMO=false
-GOOGLE_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
-APP_ORIGIN=https://YOUR_ACTUAL_SITE_DOMAIN
-HOST=0.0.0.0
-PORT=3001
-DATABASE_PATH=/YOUR_PERSISTENT_DISK/marketplace.sqlite
-UPLOADS_PATH=/YOUR_PERSISTENT_DISK/uploads
-```
-
-Replace the domain and disk placeholders with real values supplied by your host. Keep the university allowlists from section 2. Add the exact HTTPS website origin to the same Google client. Configure public branding/homepage/privacy links and review the Google console’s publishing/verification status before launch. Set `ADMIN_EMAILS` to the approved university moderator email addresses you choose.
-
-Use a fresh production database/upload directory to exclude local test accounts, or plan an explicit migration of verified real data. Simply disabling seeding does not remove existing test data. The production API hides sample listings. SQLite is suited to this single-server pilot; a multi-instance deployment would need shared database/storage and rate limits.
-
-**For public deployment, send next:** the website domain and hosting/server choice. The local Google connection has already been verified; keep credentials in the private `.env`.
+The earlier local-disk arrangement in section 4 describes local development. Render Free must use Turso for data and Cloudinary for photos; its filesystem is temporary. The backend creates/migrates the cloud schema automatically and refuses a Render startup without the required cloud configuration. Existing local student data and photos have not been uploaded.

@@ -1,6 +1,8 @@
 import { createApp } from "./app.js";
-const { app, db } = createApp();
-const host = process.env.HOST || "127.0.0.1";
+const { app, db } = await createApp();
+const host =
+  process.env.HOST ||
+  (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 if (
   process.env.NODE_ENV !== "production" &&
   process.env.DEV_AUTH !== "false" &&

@@ -2,18 +2,20 @@
   "name": "server_side",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
-  "types": "module",
+  "main": "src/server.js",
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "node --env-file-if-exists=.env src/server.js",
-    "dev": "node --env-file-if-exists=.env src/server.js"
+    "dev": "node --env-file-if-exists=.env src/server.js",
+    "db:check": "node --env-file-if-exists=.env scripts/check-database.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
@@ -26,5 +28,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

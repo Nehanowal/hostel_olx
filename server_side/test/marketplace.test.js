@@ -14,8 +14,8 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
   const domain = "nst.rishihood.edu.in";
   const previousAdmins = process.env.ADMIN_EMAILS;
   process.env.ADMIN_EMAILS = `moderator@${domain}`;
-  const db = openDatabase(database);
-  const { app } = createApp({
+  const db = await openDatabase(database);
+  const { app } = await createApp({
     db,
     seed: false,
     devAuth: true,
@@ -108,14 +108,35 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
     stranger = await login("Stranger"),
     moderator = await login("Moderator");
   let photo, listing, chat;
-  await t.test("approved email domains share one university; exact domain checks reject lookalikes", async () => {
-    assert.equal(buyer.body.user.email, "buyer@rishihood.edu.in");
-    assert.equal(seller.body.user.university, buyer.body.user.university);
-    assert.deepEqual((await request('/config')).body.domains, ['nst.rishihood.edu.in', 'csds.rishihood.edu.in', 'psy.rishihood.edu.in', 'makers.rishihood.edu.in', 'rishihood.edu.in']);
-    for (const email of ['x@rishihood.edu.in.attacker.com', 'x@fake.rishihood.edu.in', 'x@notrishihood.edu.in']) {
-      assert.equal((await request('/auth/request', {method:'POST',body:{name:'Nope',email}})).status,422);
-    }
-  });
+  await t.test(
+    "approved email domains share one university; exact domain checks reject lookalikes",
+    async () => {
+      assert.equal(buyer.body.user.email, "buyer@rishihood.edu.in");
+      assert.equal(seller.body.user.university, buyer.body.user.university);
+      assert.deepEqual((await request("/config")).body.domains, [
+        "nst.rishihood.edu.in",
+        "csds.rishihood.edu.in",
+        "psy.rishihood.edu.in",
+        "makers.rishihood.edu.in",
+        "rishihood.edu.in",
+      ]);
+      for (const email of [
+        "x@rishihood.edu.in.attacker.com",
+        "x@fake.rishihood.edu.in",
+        "x@notrishihood.edu.in",
+      ]) {
+        assert.equal(
+          (
+            await request("/auth/request", {
+              method: "POST",
+              body: { name: "Nope", email },
+            })
+          ).status,
+          422,
+        );
+      }
+    },
+  );
   await t.test(
     "validate and normalize an uploaded photo; enforce ownership",
     async () => {
@@ -246,10 +267,9 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
         ).status,
         422,
       );
-      db.prepare("UPDATE users SET university=? WHERE id=?").run(
-        "Another University",
-        stranger.body.user.id,
-      );
+      await db
+        .prepare("UPDATE users SET university=? WHERE id=?")
+        .run("Another University", stranger.body.user.id);
       assert.equal(
         (await request(`/listings/${listing.id}`, { cookie: stranger.cookie }))
           .status,
@@ -404,11 +424,13 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
         ).status,
         409,
       );
-      const otherDb = openDatabase(database);
+      const otherDb = await openDatabase(database);
       assert.equal(
-        otherDb
-          .prepare("SELECT status FROM listings WHERE id=?")
-          .get(listing.id).status,
+        (
+          await otherDb
+            .prepare("SELECT status FROM listings WHERE id=?")
+            .get(listing.id)
+        ).status,
         "sold",
       );
       otherDb.close();
@@ -474,7 +496,7 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
         404,
       );
       assert.equal(
-        db.prepare("SELECT count(*) AS n FROM admin_actions").get().n,
+        (await db.prepare("SELECT count(*) AS n FROM admin_actions").get()).n,
         1,
       );
       assert.equal(
@@ -494,10 +516,11 @@ test("student marketplace: real persistence, permissions, media, lifecycle, chat
   );
 });
 
-test("production refuses development auth and missing delivery configuration", () => {
-  const db = openDatabase(":memory:");
-  assert.throws(
-    () => createApp({ db, production: true, devAuth: true, seed: false }),
+test("production refuses development auth and missing delivery configuration", async () => {
+  const db = await openDatabase(":memory:");
+  await assert.rejects(
+    async () =>
+      await createApp({ db, production: true, devAuth: true, seed: false }),
     /Production requires/,
   );
   db.close();
