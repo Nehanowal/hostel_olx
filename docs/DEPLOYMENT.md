@@ -15,9 +15,9 @@ This guide uses the free plans for a campus pilot. The production services below
 | Render `APP_ORIGIN` | `https://hostel-olx.vercel.app` |
 | Vercel `BACKEND_ORIGIN` | `https://hostel-olx-api.onrender.com` |
 
-The live frontend, asset delivery, SPA routes, API proxy, secure authentication cookies, and Turso nonce writes/reads/deletes have passed deployment checks. Direct backend data access and unauthenticated listing access are rejected as intended.
+The live frontend, asset delivery, SPA routes, API proxy, secure authentication cookies, Turso nonce writes/reads/deletes, real university Google sign-in, and a real photo upload have passed deployment checks. The uploaded image loaded through the authenticated API and its Cloudinary download endpoint. Direct backend data access and unauthenticated listing access are rejected as intended.
 
-**Remaining launch step:** the existing Google OAuth web client must authorize `https://hostel-olx.vercel.app` under **Authorized JavaScript origins** (step 6). Google currently returns `origin_mismatch`. Complete that update using the account that owns the existing client, then verify student sign-in and a real photo upload. Cloudinary credentials are configured, but a live photo upload has not yet been verified.
+The existing Google OAuth web client now authorizes `https://hostel-olx.vercel.app` under **Authorized JavaScript origins** (step 6), and student sign-in works on that domain. Turso and Cloudinary credentials are configured on Render. The two-student listing/chat and restart-persistence checks in step 7 remain useful acceptance checks before inviting the campus; they were not part of the completed live checks above.
 
 Use the existing services for subsequent deployments; do not repeat account or database creation. Push changes to `main` to trigger the connected deployments. Keep the shared proxy secret synchronized between Render and Vercel.
 
