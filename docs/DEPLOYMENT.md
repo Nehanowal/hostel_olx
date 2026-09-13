@@ -1,6 +1,27 @@
 # Deploy Hostel OLX: Vercel + Render + Turso + Cloudinary
 
-This guide uses the free plans for a campus pilot. The repository is configured for this setup; accounts, credentials and live services still need to be created in your dashboards. The steps below start with an **empty production database**. Your existing local database and photos stay on your computer.
+This guide uses the free plans for a campus pilot. The production services below are deployed. The numbered steps document their configuration and how to reproduce it. Production started with an **empty database**; existing local data and photos have not been migrated.
+
+## Current deployment
+
+| Resource | Production value |
+| --- | --- |
+| Website | [hostel-olx.vercel.app](https://hostel-olx.vercel.app) |
+| API health check | [hostel-olx-api.onrender.com/api/health](https://hostel-olx-api.onrender.com/api/health) |
+| Vercel project | `hostel-olx`, root `client_side`, Hobby |
+| Render service | `hostel-olx-api`, root `server_side`, Free, Singapore |
+| Turso database | `hostel-olx`, libSQL, AWS AP South (Mumbai), Free |
+| Photo storage | Cloudinary Image and Video API, Free |
+| Render `APP_ORIGIN` | `https://hostel-olx.vercel.app` |
+| Vercel `BACKEND_ORIGIN` | `https://hostel-olx-api.onrender.com` |
+
+The live frontend, asset delivery, SPA routes, API proxy, secure authentication cookies, and Turso nonce writes/reads/deletes have passed deployment checks. Direct backend data access and unauthenticated listing access are rejected as intended.
+
+**Remaining launch step:** the existing Google OAuth web client must authorize `https://hostel-olx.vercel.app` under **Authorized JavaScript origins** (step 6). Google currently returns `origin_mismatch`. Complete that update using the account that owns the existing client, then verify student sign-in and a real photo upload. Cloudinary credentials are configured, but a live photo upload has not yet been verified.
+
+Use the existing services for subsequent deployments; do not repeat account or database creation. Push changes to `main` to trigger the connected deployments. Keep the shared proxy secret synchronized between Render and Vercel.
+
+## Architecture
 
 | Component | Provider | What goes there |
 | --- | --- | --- |

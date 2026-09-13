@@ -1,6 +1,6 @@
 # Google sign-in and database setup
 
-**Local connection verified:** the client ID is configured in the private `.env`, test authentication is disabled, and a real Rishihood Google sign-in succeeded in Chrome at http://localhost:3002. Public hosting is still pending. The instructions below remain useful for another environment or a future deployment.
+**Local connection verified:** the client ID is configured in the private `.env`, test authentication is disabled, and a real Rishihood Google sign-in succeeded in Chrome at http://localhost:3002. The frontend and backend are now publicly deployed; see [the deployment guide](DEPLOYMENT.md) for the live URLs and remaining Google production-origin setup. The instructions below remain useful for local development or another environment.
 
 The updated project is `/Users/nehasharma/hostel_olx`. The older MVP under `Documents/Codex/2026-09-10/files-pasted-by-the-user-you/hostel_olx` is a separate copy. Run the updated folder to see these changes.
 
