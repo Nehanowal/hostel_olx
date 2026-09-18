@@ -78,3 +78,8 @@ CREATE TABLE IF NOT EXISTS listing_impressions (
  listing_id TEXT NOT NULL REFERENCES listings(id), viewer_id TEXT NOT NULL REFERENCES users(id),
  day TEXT NOT NULL, PRIMARY KEY(listing_id,viewer_id,day)
 );
+
+CREATE TABLE IF NOT EXISTS listing_opens (
+ listing_id TEXT NOT NULL REFERENCES listings(id), viewer_id TEXT NOT NULL REFERENCES users(id),
+ day TEXT NOT NULL, PRIMARY KEY(listing_id,viewer_id,day)
+);

@@ -244,6 +244,7 @@ test("fresh uploads lead, older popular listings rise, impressions deduplicate a
     popular = await listing("Older popular", 90, 8),
     fresh = await listing("Fresh", 2),
     newest = await listing("Newest", 1);
+  await db.prepare("UPDATE listings SET opens=8 WHERE id=?").run(popular);
   const hidden = await listing("Hidden", 0, 100, "unavailable"),
     sold = await listing("Sold", 0, 100, "sold"),
     foreign = await listing(
@@ -657,4 +658,60 @@ test("Google-only production works without SMTP and exposes CSP needed for its o
     ).status,
     403,
   );
+});
+
+test("popular campus finds rank deliberate opens, deduplicate daily and exclude ineligible listings", async t => {
+  const { db, path, request, login } = await fixture(t);
+  const seller = await login("Seller"), buyer = await login("Buyer"), other = await login("Other");
+  const university = seller.body.user.university;
+  async function listing(title, overrides = {}) {
+    const id = randomUUID();
+    await db.prepare("INSERT INTO listings(id,seller_id,university,title,description,category,price,condition,location,status,is_demo,impressions,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").run(
+      id, seller.body.user.id, overrides.university || university, title, "Campus find", "Other", 20000, "Good", "Campus",
+      overrides.status || "active", overrides.demo || 0, overrides.impressions || 0, "2026-01-01T00:00:00.000Z");
+    return id;
+  }
+  const clicked = await listing("Clicked"), seen = await listing("Seen", { impressions: 1000 });
+  const excluded = [await listing("Sold", { status: "sold" }), await listing("Hidden", { status: "unavailable" }), await listing("Deleted", { status: "deleted" }), await listing("Removed", { status: "removed" }), await listing("Sample", { demo: 1 }), await listing("Foreign", { university: "Elsewhere" })];
+  const open = (id, cookie = buyer.cookie) => request(`/listings/${id}/open`, { method: "POST", cookie });
+  assert.equal((await request("/listings/popular")).status, 401);
+  assert.equal((await request(`/listings/${clicked}/open`, { method: "POST" })).status, 401);
+  assert.equal((await open("invalid")).status, 422);
+  await request(`/listings/${clicked}`, { cookie: buyer.cookie });
+  assert.equal((await db.prepare("SELECT opens FROM listings WHERE id=?").get(clicked)).opens, 0);
+  await Promise.all([open(clicked), open(clicked), open(clicked)]);
+  await open(clicked, seller.cookie);
+  for (const id of excluded) await open(id);
+  assert.equal((await db.prepare("SELECT opens FROM listings WHERE id=?").get(clicked)).opens, 1);
+  for (const id of excluded) assert.equal((await db.prepare("SELECT opens FROM listings WHERE id=?").get(id)).opens, 0);
+  await open(clicked, other.cookie);
+  assert.equal((await db.prepare("SELECT opens FROM listings WHERE id=?").get(clicked)).opens, 2);
+  await db.prepare("UPDATE listing_opens SET day='2000-01-01' WHERE listing_id=?").run(clicked);
+  await open(clicked);
+  assert.equal((await db.prepare("SELECT opens FROM listings WHERE id=?").get(clicked)).opens, 3);
+  const popular = await request("/listings/popular", { cookie: buyer.cookie });
+  assert.deepEqual(popular.body.items.map(i => i.id), [clicked, seen]);
+  assert.equal((await request("/listings?sort=popular", { cookie: buyer.cookie })).body.items[0].id, clicked);
+  const reopened = await openDatabase(path);
+  assert.equal((await reopened.prepare("SELECT opens FROM listings WHERE id=?").get(clicked)).opens, 3);
+  reopened.close();
+  await db.prepare("UPDATE users SET status='suspended' WHERE id=?").run(seller.body.user.id);
+  await open(clicked, other.cookie);
+  assert.equal((await db.prepare("SELECT opens FROM listings WHERE id=?").get(clicked)).opens, 3);
+  assert.deepEqual((await request("/listings/popular", { cookie: buyer.cookie })).body.items, []);
+});
+
+test("existing databases gain click tracking without losing listings or impression history", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "final-price-migration-"));
+  const path = join(dir, "old.sqlite");
+  let db = await openDatabase(path);
+  await db.prepare("INSERT INTO users(id,email,name,university,verified_at) VALUES ('seller','seller@example.edu','Seller','Campus','2026-01-01')").run();
+  await db.prepare("INSERT INTO listings(id,seller_id,university,title,description,category,price,condition,location,impressions) VALUES ('existing','seller','Campus','Existing item','Keep me','Other',100,'Good','Campus',42)").run();
+  await db.exec("DROP TABLE listing_opens; ALTER TABLE listings DROP COLUMN opens;");
+  db.close();
+  db = await openDatabase(path);
+  const row = await db.prepare("SELECT title,impressions,opens FROM listings WHERE id='existing'").get();
+  assert.deepEqual(row, { title: "Existing item", impressions: 42, opens: 0 });
+  assert.deepEqual(await db.prepare("SELECT * FROM listing_opens").all(), []);
+  db.close();
 });

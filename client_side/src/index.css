@@ -1,15 +1,18 @@
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 100 1000; font-display: swap; src: url("/fonts/dm-sans.ttf") format("truetype"); }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/fonts/space-grotesk.ttf") format("truetype"); }
 :root {
-  font-family: "Inter", "Segoe UI", sans-serif;
-  color: #222632;
-  background: #fafbfc;
+  color-scheme: light;
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+  color: #18203d;
+  background: #f3f5f9;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   font-size: 16px;
-  --blue: #294cda;
-  --ink: #222632;
-  --muted: #737887;
-  --line: #e6e8ee;
+  --blue: #284df3;
+  --ink: #18203d;
+  --muted: #606878;
+  --line: #dfe3ed;
 }
 * {
   box-sizing: border-box;
@@ -62,7 +65,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--blue) !important;
-  box-shadow: 0 0 0 3px #294cda18;
+  box-shadow: 0 0 0 3px #284df318;
 }
 label {
   display: flex;

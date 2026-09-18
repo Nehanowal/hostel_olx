@@ -421,7 +421,7 @@ export async function createApp(options = {}) {
         await smtp.sendMail({
           from: process.env.SMTP_FROM,
           to: email,
-          subject: "Your Hostel OLX sign-in code",
+          subject: "Your Final Price? sign-in code",
           text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, ignore this email.`,
         });
       } catch {
@@ -536,8 +536,8 @@ export async function createApp(options = {}) {
       .total;
     const sort = {
       recommended:
-        "l.is_demo ASC,CASE WHEN l.created_at>=? THEN 0 ELSE 1 END ASC,CASE WHEN l.created_at>=? THEN l.created_at END DESC,l.impressions DESC,l.created_at DESC,l.id DESC",
-      popular: "l.impressions DESC,l.created_at DESC,l.id DESC",
+        "l.is_demo ASC,CASE WHEN l.created_at>=? THEN 0 ELSE 1 END ASC,CASE WHEN l.created_at>=? THEN l.created_at END DESC,l.opens DESC,l.created_at DESC,l.id DESC",
+      popular: "l.opens DESC,l.created_at DESC,l.id DESC",
       newest: "l.created_at DESC,l.id DESC",
       "price-low": "l.price ASC,l.id DESC",
       "price-high": "l.price DESC,l.id DESC",
@@ -585,6 +585,28 @@ export async function createApp(options = {}) {
       await run("DELETE FROM listing_impressions WHERE day<?", day);
     });
     res.json({ ok: true });
+  });
+  app.post("/api/listings/:id/open", auth, async (req, res) => {
+    const id = z.uuid().parse(req.params.id);
+    const day = new Date().toISOString().slice(0, 10);
+    await transaction(async () => {
+      const inserted = await all(
+        `INSERT OR IGNORE INTO listing_opens(listing_id,viewer_id,day)
+         SELECT id,?,? FROM listings WHERE id=? AND university=? AND seller_id<>?
+         AND status='active' AND is_demo=0
+         AND EXISTS(SELECT 1 FROM users WHERE users.id=listings.seller_id AND users.status='active')
+         RETURNING listing_id`, req.user.id, day, id, req.user.university, req.user.id);
+      if (inserted.length) await run("UPDATE listings SET opens=opens+1 WHERE id=?", id);
+      await run("DELETE FROM listing_opens WHERE day<?", day);
+    });
+    res.json({ ok: true });
+  });
+  app.get("/api/listings/popular", auth, async (req, res) => {
+    const rows = await all(
+      `SELECT l.*,u.name AS seller_name FROM listings l JOIN users u ON u.id=l.seller_id
+       WHERE l.university=? AND l.status='active' AND l.is_demo=0 AND u.status='active'
+       ORDER BY l.opens DESC,l.created_at DESC,l.id DESC LIMIT 12`, req.user.university);
+    res.json({ items: await Promise.all(rows.map(row => listingDto(row, req.user))) });
   });
   app.get("/api/listings/most-viewed", auth, async (req, res) => {
     // This row ranks the entire campus inventory independently of the paginated

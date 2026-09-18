@@ -71,7 +71,11 @@ export function ListingDetail({
     let alive = true;
     api(`/listings/${id}`)
       .then((v) => {
-        if (alive) setItem(v);
+        if (alive) {
+          setItem(v);
+          // Count deliberate detail opens, never carousel rotations or card visibility.
+          api(`/listings/${id}/open`, { method: "POST" }).catch(() => {});
+        }
       })
       .catch((e) => {
         if (alive) setError(e.message);

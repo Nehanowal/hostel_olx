@@ -20,8 +20,6 @@ import {
   Store,
   Check,
   AlertCircle,
-  Eye,
-  Sparkles,
   RefreshCw,
 } from "lucide-react";
 import { api, money } from "./api";
@@ -72,9 +70,9 @@ function SignIn({ config, onLogin }) {
       <section className="signin-story">
         <span className="eyebrow">YOUR CAMPUS MARKETPLACE</span>
         <h1>
-          Great finds.
+          Big finds.
           <br />
-          Right on campus.
+          Small prices.
         </h1>
         <p>
           Books, tech and everyday essentials.
@@ -93,7 +91,7 @@ function SignIn({ config, onLogin }) {
           </span>
         </div>
         <div className="story-bottom">
-          <span className="large-mark">h.</span>
+          <span className="large-mark">?</span>
           <p>
             Your everyday finds.
             <br />
@@ -307,6 +305,7 @@ export default function App() {
     };
   }, [user, view, query, category, sort, condition, maxPrice, page, refresh]);
   function navigate(next) {
+    setRefresh(n => n + 1);
     setView(next);
     setItems([]);
     setTotal(0);
@@ -349,21 +348,21 @@ export default function App() {
   if (!ready)
     return (
       <div className="loading-page">
-        <div className="brand-mark">h.</div>
+        <div className="brand-mark" aria-label="Final Price?">?</div>
         <p>Opening your campus marketplace…</p>
       </div>
     );
   return (
     <>
+      <div className="campus-strip"><span>GOOD FINDS. PEOPLE YOU KNOW.</span><span>{config.university}</span></div>
       <header className="site-header">
         <button
           className="brand"
           onClick={() => navigate("browse")}
-          aria-label="Hostel OLX home"
+          aria-label="Final Price? home"
         >
-          <span className="brand-mark">h.</span>
           <span>
-            hostel<span className="brand-light">olx</span>
+            Final Price<span className="wordmark-question">?</span>
             <small>THE CAMPUS MARKETPLACE</small>
           </span>
         </button>
@@ -448,47 +447,26 @@ export default function App() {
             <Admin notify={notify} />
           ) : (
             <>
-              <div className="page-heading">
-                <div>
-                  <div className="eyebrow">
-                    <MapPin size={14} /> {user.university.toUpperCase()} ·
-                    SONIPAT
+              {view === "browse" ? (
+                <section className="campus-hero" aria-label="Your campus marketplace">
+                  <div className="hero-copy">
+                    <div className="eyebrow">YOUR CAMPUS. YOUR PEOPLE.</div>
+                    <h1>Big finds.<br /><span>Small prices.</span></h1>
+                    <p>Your next favourite find could be a few doors away.</p>
+                    <a href="#campus-listings">Find your next thing <ArrowUpRight size={18} /></a>
                   </div>
-                  <h1>
-                    {view === "browse"
-                      ? "Your campus. Your marketplace."
-                      : view === "mine"
-                        ? "Your listings, all in one place."
-                        : "Good finds, kept close."}
-                  </h1>
-                  <p>
-                    {view === "browse"
-                      ? "Find what you need. Buy and sell with students on campus."
-                      : view === "mine"
-                        ? "Manage your listings and let buyers know what’s available."
-                        : "A little collection of things you’ve got your eye on."}
-                  </p>
-                </div>
-                <div className="campus-note">
-                  <ShieldCheck size={22} />
-                  <span>
-                    By students.
-                    <br />
-                    <strong>For students.</strong>
-                  </span>
-                </div>
-              </div>
-              {view === "browse" && (
-                <MostViewed
-                  key={user.id}
-                  userId={user.id}
-                  refresh={refresh}
-                  modalOpen={!!modal}
-                  onOpen={id => setModal({ type: "detail", id })}
-                  onCreate={() => setModal({ type: "create" })}
-                />
+                  <MostViewed key={user.id} userId={user.id} refresh={refresh}
+                    modalOpen={!!modal} onOpen={id => setModal({ type: "detail", id })}
+                    onCreate={() => setModal({ type: "create" })} />
+                </section>
+              ) : (
+                <div className="page-heading"><div>
+                  <div className="eyebrow"><MapPin size={14} /> {user.university}</div>
+                  <h1>{view === "mine" ? "Your listings, all in one place." : "Good finds, kept close."}</h1>
+                  <p>{view === "mine" ? "Manage your listings and let buyers know what’s available." : "A little collection of things you’ve got your eye on."}</p>
+                </div></div>
               )}
-              <div className="search-row">
+              <div className="search-row" id="campus-listings">
                 <div className="search-box">
                   <Search size={21} />
                   <input
@@ -592,12 +570,12 @@ export default function App() {
                 })}
               </div>
               <div className="results-heading">
-                <h2>
+                <h2 className={view === "browse" && !query && !category ? "sr-only" : ""}>
                   {query
                     ? `Results for “${query}”`
                     : category ||
                       {
-                        browse: "Fresh on campus",
+                        browse: "Campus listings",
                         mine: "My listings",
                         saved: "Saved items",
                       }[view]}{" "}
@@ -613,8 +591,8 @@ export default function App() {
                       setPage(1);
                     }}
                   >
-                    <option value="recommended">Fresh + popular</option>
-                    <option value="popular">Most viewed</option>
+                    <option value="recommended">Recommended</option>
+                    <option value="popular">Popular on campus</option>
                     <option value="newest">Newest first</option>
                     <option value="price-low">Price: low to high</option>
                     <option value="price-high">Price: high to low</option>
@@ -622,7 +600,7 @@ export default function App() {
                 </label>
               </div>
               <div className="feed-context">
-                <p>{view === "mine" ? "Available listings are visible to every approved course. Sold and unavailable items are hidden from Explore." : view === "browse" && sort === "recommended" ? "New in the last 48 hours first. Then the finds getting the most attention." : sort === "popular" ? "Ranked by impressions. A visible card counts once per student per day." : "One campus marketplace, across all approved courses."}</p>
+                {view === "mine" && <p>Sold and unavailable items are hidden from Explore.</p>}
                 <button className="text-button" onClick={reload} disabled={loading}><RefreshCw size={15} /> Refresh</button>
               </div>
               {error ? (
@@ -680,10 +658,6 @@ export default function App() {
                         )}
                       </div>
                       <div className="card-body">
-                        {!item.is_demo && <div className="listing-signals">
-                          {item.is_fresh ? <span className="fresh-label"><Sparkles size={12} /> Just dropped</span> : <span>{item.isOwner && item.status !== "active" ? "Hidden from Explore" : "Campus find"}</span>}
-                          <span title="Card impressions, once per student per day"><Eye size={13} /> {item.impressions || 0}</span>
-                        </div>}
                         <div className="card-price">
                           {money(item.price)}
                           <span>{item.category}</span>
@@ -758,7 +732,7 @@ export default function App() {
                 </div>
               )}
               <footer>
-                <span className="footer-brand">hostelolx</span>
+                <span className="footer-brand">Final Price?</span>
               </footer>
             </>
           )}

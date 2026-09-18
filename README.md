@@ -1,13 +1,14 @@
-# Hostel OLX
+# Final Price?
 
 A working, local-first student marketplace for **Rishihood University**, accepting **@nst.rishihood.edu.in**, **@csds.rishihood.edu.in**, **@psy.rishihood.edu.in**, **@makers.rishihood.edu.in**, and **@rishihood.edu.in**. All five domains share one university marketplace. Built on the repository's React + Vite frontend and Express backend. All runtime libraries are free; local development needs no paid account, hosted database, API key, or credit card.
 
 ## Latest improvements
 
 - Scroll reveals, card hover effects, button feedback, animated dialog opening/closing, image lightbox with zoom and keyboard controls, and reduced-motion support.
-- **Most viewed on campus** sits above the main feed: a horizontal carousel of up to 12 available student listings, ranked by impressions (newest first on ties), with one-card arrow navigation, touch scrolling and keyboard access. It ranks the whole campus inventory independently of search, filters and feed pagination; samples and suspended sellers are excluded. Open any card for full details, photos and seller chat. The main feed still promotes new uploads.
-- Default **Fresh + popular** sorting: real uploads from the last 48 hours first (newest first), then older listings by cumulative impressions; samples follow real listings. **Most viewed**, **Newest first**, and price sorting remain available.
-- Impressions count when a card is at least 50% visible for one continuous second in a visible tab. Owner views and sample listings do not count. The database deduplicates each student/listing/day; repeat refreshes do not inflate that day's count. Rankings update when the feed reloads, without moving cards while you browse. These are impressions, not lifetime unique people or purchase counts.
+- **Final Price?** branding, a light cool-grey canvas, blue “Big finds. Small prices.” hero, and self-hosted DM Sans / Space Grotesk fonts.
+- **Popular on campus** rotates one available student listing at a time inside the hero. It ranks up to 12 items by deliberate detail opens, with newest-first ties. Rotation pauses on hover, keyboard focus, open dialogs and hidden tabs; reduced-motion users get manual navigation. No popularity counts appear in the interface.
+- Opens count once per student/listing/UTC day. Owner opens, sample listings, unavailable items, other universities and suspended sellers are excluded. Existing impression history is retained separately; it does not drive the new popularity ranking. New click counts begin at zero after deployment.
+- **Recommended** sorting keeps new uploads from the last 48 hours first, then older listings by opens. **Popular on campus**, **Newest first**, and price sorting remain available. The default listing grid has no visible section title.
 - Visibility explanations and direct reactivation in **My listings**, confirmation before hiding an item, filter reset on publishing/account changes, and refresh on returning to the page.
 - Official Google Identity Services button and server verification, Google-only mode, exact email and hosted-domain checks, one-use nonces, and preservation of existing account inventory.
 

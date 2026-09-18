@@ -1,114 +1,157 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Eye, MapPin, TrendingUp } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Package,
+  Pause,
+  Play,
+} from "lucide-react";
 import { api, money } from "./api";
-import { useListingActivity } from "./useListingActivity";
 
-export default function MostViewed({ userId, refresh, modalOpen, onOpen, onCreate }) {
+export default function MostViewed({
+  userId,
+  refresh,
+  modalOpen,
+  onOpen,
+  onCreate,
+}) {
   const [result, setResult] = useState({ items: [], loading: true, error: "" });
   const [retry, setRetry] = useState(0);
-  const [edges, setEdges] = useState({ start: true, end: true });
-  const { items, loading, error } = result;
-  const track = useListingActivity(items, userId, loading, modalOpen);
-
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [hidden, setHidden] = useState(() => document.hidden);
+  const [reducedMotion, setReducedMotion] = useState(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   useEffect(() => {
     let alive = true;
-    api("/listings/most-viewed")
-      .then(data => {
+    api("/listings/popular")
+      .then((data) => {
         if (alive) setResult({ items: data.items, loading: false, error: "" });
       })
-      .catch(e => {
-        if (alive) setResult({ items: [], loading: false, error: e.message });
+      .catch((error) => {
+        if (alive)
+          setResult({ items: [], loading: false, error: error.message });
       });
-    return () => { alive = false; };
-  }, [userId, refresh, retry]);
-
-  useEffect(() => {
-    const element = track.current;
-    if (!element) return;
-    function measure() {
-      const start = element.scrollLeft <= 2;
-      const end = element.scrollLeft + element.clientWidth >= element.scrollWidth - 2;
-      setEdges(previous => previous.start === start && previous.end === end ? previous : { start, end });
-    }
-    const frame = requestAnimationFrame(measure);
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    element.addEventListener("scroll", measure, { passive: true });
     return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      element.removeEventListener("scroll", measure);
+      alive = false;
     };
-  }, [items, track]);
-
-  function move(direction) {
-    const element = track.current;
-    const card = element?.firstElementChild;
-    if (!card) return;
-    const gap = parseFloat(getComputedStyle(element).columnGap) || 0;
-    element.scrollBy({
-      left: direction * (card.getBoundingClientRect().width + gap),
-      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-    });
+  }, [userId, refresh, retry]);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const motion = () => setReducedMotion(media.matches);
+    const visibility = () => setHidden(document.hidden);
+    media.addEventListener("change", motion);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      media.removeEventListener("change", motion);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, []);
+  const count = result.items.length;
+  const stopped =
+    paused || hovered || focused || hidden || modalOpen || reducedMotion;
+  useEffect(() => {
+    if (stopped || count < 2) return;
+    const timer = window.setInterval(
+      () => setIndex((i) => (i + 1) % count),
+      6000,
+    );
+    return () => window.clearInterval(timer);
+  }, [stopped, count]);
+  const item = result.items[index % count];
+  function move(step) {
+    setPaused(true);
+    setIndex((i) => (i + step + count) % count);
   }
-
   return (
-    <section className="most-viewed" aria-labelledby="most-viewed-title" aria-roledescription="carousel">
-      <div className="most-viewed-heading">
-        <div>
-          <span className="most-viewed-kicker"><TrendingUp size={15} /> THE CAMPUS SPOTLIGHT</span>
-          <h2 id="most-viewed-title">Most viewed on campus</h2>
-          <p>The finds getting the most attention. Highest impressions first.</p>
-        </div>
-        {!!items.length && <div className="carousel-controls">
-          <button className="carousel-arrow" aria-label="Previous most-viewed item" aria-controls="most-viewed-track" disabled={edges.start} onClick={() => move(-1)}><ArrowLeft size={19} /></button>
-          <button className="carousel-arrow" aria-label="Next most-viewed item" aria-controls="most-viewed-track" disabled={edges.end} onClick={() => move(1)}><ArrowRight size={19} /></button>
-        </div>}
+    <section
+      className="hero-spotlight"
+      aria-label="Popular on campus"
+      aria-roledescription="carousel"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
+      }}
+    >
+      <div className="spotlight-label">
+        <span className="spotlight-dot" /> Popular on campus
       </div>
-      {loading ? (
-        <div className="spotlight-skeletons" role="status" aria-label="Loading most-viewed listings">
-          {[1, 2, 3, 4].map(n => <div className="skeleton-card" key={n} />)}
+      {result.loading ? (
+        <div className="spotlight-placeholder" role="status">
+          Finding campus favourites…
         </div>
-      ) : error ? (
-        <div className="spotlight-empty" role="status">
-          <p>Couldn’t load the campus spotlight. {error}</p>
-          <button className="text-button" onClick={() => { setResult({ items: [], loading: true, error: "" }); setRetry(n => n + 1); }}>Try again</button>
+      ) : result.error ? (
+        <div className="spotlight-placeholder">
+          <p>Couldn’t load campus favourites.</p>
+          <button onClick={() => setRetry((i) => i + 1)}>
+            Try again <ArrowRight size={16} />
+          </button>
         </div>
-      ) : items.length ? (
-        <>
-          <ol ref={track} id="most-viewed-track" className="most-viewed-track" tabIndex={0} aria-label="Products ranked by impressions; use left and right arrow keys to scroll" onKeyDown={event => {
-            if (event.target !== event.currentTarget) return;
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); move(event.key === "ArrowRight" ? 1 : -1); }
-          }}>
-            {items.map((item, index) => (
-              <li className="listing-card spotlight-card" key={item.id} data-listing-id={item.id} data-count-impression={!item.isOwner} style={{ "--reveal-delay": `${Math.min(index, 3) * 55}ms` }}>
-                <button className="spotlight-card-link" onClick={() => onOpen(item.id)} aria-label={`View ${item.title}, ${money(item.price)}, ${item.impressions} impressions`}>
-                  <span className="spotlight-photo">
-                    <img src={item.images[0]?.url} alt={item.title} loading={index < 4 ? "eager" : "lazy"} />
-                    <span className="spotlight-rank">#{index + 1}</span>
-                    <span className="spotlight-condition">{item.condition}</span>
-                  </span>
-                  <span className="spotlight-body">
-                    <span className="spotlight-category">{item.category}</span>
-                    <span className="spotlight-title">{item.title}</span>
-                    <span className="spotlight-price">{money(item.price)}</span>
-                    <span className="spotlight-location"><MapPin size={12} />{item.location}</span>
-                    <span className="spotlight-footer">
-                      <span><Eye size={14} />{item.impressions.toLocaleString()} {item.impressions === 1 ? "impression" : "impressions"}</span>
-                      <ArrowRight size={17} />
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-          <div className="spotlight-caption"><span>Open a find for photos, details & seller chat.</span>{(!edges.start || !edges.end) && <span>Swipe or use the arrows <ArrowRight size={13} /></span>}</div>
-        </>
+      ) : !item ? (
+        <div className="spotlight-placeholder">
+          <Package size={36} />
+          <h2>A new home for your old favourite.</h2>
+          <button onClick={onCreate}>
+            List your first find <ArrowUpRight size={17} />
+          </button>
+        </div>
       ) : (
-        <div className="spotlight-empty">
-          <p>Your next campus favourite could start here. Available student listings appear as soon as they’re published.</p>
-          <button className="text-button" onClick={onCreate}>List an item <ArrowRight size={16} /></button>
-        </div>
+        <>
+          <button
+            className="spotlight-card"
+            onClick={() => onOpen(item.id)}
+            aria-label={`View ${item.title}, ${money(item.price)}`}
+          >
+            <div className="spotlight-photo" key={item.id}>
+              {item.images[0] ? (
+                <img src={item.images[0].url} alt="" />
+              ) : (
+                <Package size={50} />
+              )}
+              <span>{item.condition}</span>
+            </div>
+            <div className="spotlight-info">
+              <div>
+                <h2>{item.title}</h2>
+                <p>{item.location}</p>
+              </div>
+              <strong>{money(item.price)}</strong>
+              <ArrowUpRight size={20} />
+            </div>
+          </button>
+          {count > 1 && (
+            <div className="spotlight-controls">
+              <button
+                onClick={() => move(-1)}
+                aria-label="Previous popular item"
+              >
+                <ArrowLeft size={17} />
+              </button>
+              <span aria-live={stopped ? "polite" : "off"}>
+                {(index % count) + 1} / {count}
+              </span>
+              <button onClick={() => move(1)} aria-label="Next popular item">
+                <ArrowRight size={17} />
+              </button>
+              {!reducedMotion && (
+                <button
+                  onClick={() => setPaused((v) => !v)}
+                  aria-label={
+                    paused ? "Start item rotation" : "Pause item rotation"
+                  }
+                >
+                  {paused ? <Play size={15} /> : <Pause size={15} />}
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
     </section>
   );
