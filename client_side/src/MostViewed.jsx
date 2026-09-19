@@ -11,6 +11,7 @@ import { api, money } from "./api";
 
 export default function MostViewed({
   userId,
+  endpoint = "/listings/popular",
   refresh,
   modalOpen,
   onOpen,
@@ -28,9 +29,9 @@ export default function MostViewed({
   );
   useEffect(() => {
     let alive = true;
-    api("/listings/popular")
+    api(endpoint)
       .then((data) => {
-        if (alive) setResult({ items: data.items, loading: false, error: "" });
+        if (alive) setResult({ items: data.items.slice(0,12), loading: false, error: "" });
       })
       .catch((error) => {
         if (alive)
@@ -39,7 +40,7 @@ export default function MostViewed({
     return () => {
       alive = false;
     };
-  }, [userId, refresh, retry]);
+  }, [userId, refresh, retry, endpoint]);
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const motion = () => setReducedMotion(media.matches);

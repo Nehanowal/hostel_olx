@@ -1,0 +1,7 @@
+import {useState} from 'react';
+import GuestExplore from './GuestExplore';
+export default function StudentDemo(){
+ const [open,setOpen]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState('');
+ if(open)return <GuestExplore demo onExit={()=>{setOpen(false);setPassword('');}}/>;
+ return <main className="demo-login"><div className="eyebrow">FINAL PRICE? · STUDENT DEMO</div><h1>Take a look inside.</h1><p>Explore current listings in the student layout. This demo cannot post items, send messages or access private student data.</p><div className="demo-credentials"><strong>Demo email</strong><code>demo@finalprice.example</code><strong>Demo password</strong><code>FinalPriceDemo</code></div><form onSubmit={e=>{e.preventDefault();if(email.trim().toLowerCase()==='demo@finalprice.example'&&password==='FinalPriceDemo'){setError('');setOpen(true);}else setError('Use the demo email and password shown above.');}}><label>Email<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="off"/></label><label>Password<input type="password" required value={password} onChange={e=>setPassword(e.target.value)} autoComplete="off"/></label>{error&&<p className="error" role="alert">{error}</p>}<button className="primary" type="submit">Open student demo</button></form><a href="/">Back to college sign-in</a></main>;
+}
