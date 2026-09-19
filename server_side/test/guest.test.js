@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {openDatabase} from '../src/db.js';
+import {createApp} from '../src/app.js';
+test('guests browse active public projections while private data, hidden media and mutations stay protected',async t=>{
+ const db=await openDatabase(':memory:');const {app}=await createApp({db,seed:false,devAuth:true,imageStorage:{send:(path,res)=>res.json({photo:true}),save:async()=>'',remove:async()=>{}}});
+ const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>{server.close();db.close();});const university=process.env.UNIVERSITY_NAME||'Rishihood University';
+ const user=randomUUID();await db.prepare('INSERT INTO users(id,email,name,university,verified_at) VALUES (?,?,?,?,?)').run(user,'private@nst.rishihood.edu.in','Private Seller',university,new Date().toISOString());
+ const add=async(status='active',campus=university,demo=0)=>{const id=randomUUID(),image=randomUUID();await db.prepare('INSERT INTO listings(id,seller_id,university,title,description,category,price,condition,location,attributes,status,is_demo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(id,user,campus,'Desk lamp','Private description and contact info','Other',10000,'Good','Private room 109','{"phone":"private"}',status,demo);await db.prepare('INSERT INTO images(id,owner_id,listing_id,path,created_at) VALUES (?,?,?,?,?)').run(image,user,id,'private-storage-key',Date.now());return {id,image};};
+ const active=await add();const hidden=[];for(const status of ['sold','deleted','removed','unavailable'])hidden.push(await add(status));hidden.push(await add('active','Another University'));hidden.push(await add('active',university,1));
+ const orphan=randomUUID();await db.prepare('INSERT INTO images(id,owner_id,path,created_at) VALUES (?,?,?,?)').run(orphan,user,'unused-private-photo',Date.now());
+ const request=async(path,method='GET')=>{const r=await fetch(`http://127.0.0.1:${server.address().port}/api${path}`,{method,headers:{'X-Requested-With':'HostelOLX','Content-Type':'application/json'},body:method==='GET'?undefined:'{}'});return {status:r.status,body:await r.json()};};
+ const result=await request('/guest/listings');assert.equal(result.status,200);assert.equal(result.body.total,1);assert.equal(result.body.items[0].id,active.id);
+ assert.deepEqual(Object.keys(result.body.items[0]).sort(),['category','condition','created_at','id','images','price','title']);assert.ok(!JSON.stringify(result.body).includes('Private'));assert.ok(!JSON.stringify(result.body).includes('private-storage-key'));
+ assert.equal((await request(`/guest/images/${active.image}`)).status,200);for(const item of hidden)assert.equal((await request(`/guest/images/${item.image}`)).status,404);assert.equal((await request(`/guest/images/${orphan}`)).status,404);
+ for(const path of ['/listings','/conversations','/admin/dashboard',`/images/${active.image}`])assert.equal((await request(path)).status,401);
+ assert.equal((await request('/listings','POST')).status,401);assert.equal((await request(`/listings/${active.id}/favorite`,'PUT')).status,401);
+ assert.equal((await request('/guest/listings?category=Fashion')).body.total,0);assert.equal((await request('/guest/listings?page=0')).status,422);
+ await db.prepare("UPDATE users SET status='suspended' WHERE id=?").run(user);assert.equal((await request('/guest/listings')).body.total,0);assert.equal((await request(`/guest/images/${active.image}`)).status,404);
+});

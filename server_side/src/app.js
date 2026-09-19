@@ -1,3 +1,4 @@
+import { guestRoutes } from './guest.js';
 import { createProductUpdates, productUpdateRoutes } from './product-updates.js';
 import { adminDashboard } from './admin-dashboard.js';
 import { createNotificationMailer, createMessageNotifications } from "./message-notifications.js";
@@ -244,6 +245,7 @@ export async function createApp(options = {}) {
     adminEmails.includes(req.user.email)
       ? next()
       : next(fail(403, "Administrator access required."));
+  guestRoutes({app,db,university,imageStorage});
   adminDashboard({ app, db, auth, admin });
   productUpdateRoutes({app,db,auth,updates:productUpdates});
   const authLimit = rateLimit({

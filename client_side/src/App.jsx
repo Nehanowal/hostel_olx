@@ -1,3 +1,4 @@
+import GuestExplore from './GuestExplore';
 import { ProductUpdatePreference, ProductUnsubscribe } from './ProductUpdates';
 import AdminDashboard from './AdminDashboard';
 import { useState, useEffect, useCallback } from "react";
@@ -200,6 +201,7 @@ function SignIn({ config, onLogin }) {
             </button>
           )}
         </form>}
+        <a className="guest-entry" href="/?guest=1">Explore as a guest <ArrowRight size={18}/></a>
         <p className="signin-note">
           <ShieldCheck size={17} /> Campus access. No public phone numbers.
         </p>
@@ -210,7 +212,7 @@ function SignIn({ config, onLogin }) {
 
 export default function App() {
   const token = new URLSearchParams(window.location.search).get('unsubscribeUpdates');
-  return token ? <ProductUnsubscribe token={token}/> : <MarketplaceApp/>;
+  return token ? <ProductUnsubscribe token={token}/> : new URLSearchParams(window.location.search).get('guest') === '1' ? <GuestExplore/> : <MarketplaceApp/>;
 }
 function MarketplaceApp() {
   const [config, setConfig] = useState(null),
