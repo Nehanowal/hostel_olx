@@ -93,3 +93,31 @@ CREATE TABLE IF NOT EXISTS message_email_outbox (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_message_email_active ON message_email_outbox(conversation_id,recipient_id) WHERE status IN ('pending','sending');
 CREATE INDEX IF NOT EXISTS idx_message_email_due ON message_email_outbox(status,due_at);
+
+CREATE TABLE IF NOT EXISTS platform_metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL);
+INSERT OR IGNORE INTO platform_metadata VALUES ('tracking_since',strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+CREATE TABLE IF NOT EXISTS user_visits (
+ user_id TEXT NOT NULL REFERENCES users(id), day TEXT NOT NULL, last_seen INTEGER NOT NULL,
+ PRIMARY KEY(user_id,day)
+);
+CREATE INDEX IF NOT EXISTS idx_visits_recent ON user_visits(last_seen);
+CREATE TABLE IF NOT EXISTS platform_activity (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,user_id TEXT NOT NULL REFERENCES users(id),
+ listing_id TEXT REFERENCES listings(id),action TEXT NOT NULL,title TEXT NOT NULL DEFAULT '',
+ created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TRIGGER IF NOT EXISTS activity_signup AFTER INSERT ON users BEGIN
+ INSERT INTO platform_activity(user_id,action) VALUES (NEW.id,'Joined');
+END;
+CREATE TRIGGER IF NOT EXISTS activity_listing_create AFTER INSERT ON listings WHEN NEW.is_demo=0 BEGIN
+ INSERT INTO platform_activity(user_id,listing_id,action,title) VALUES (NEW.seller_id,NEW.id,'Listed',NEW.title);
+END;
+CREATE TRIGGER IF NOT EXISTS activity_listing_update AFTER UPDATE ON listings WHEN NEW.is_demo=0 AND (NEW.status<>OLD.status OR NEW.version<>OLD.version) BEGIN
+ INSERT INTO platform_activity(user_id,listing_id,action,title) VALUES (NEW.seller_id,NEW.id,CASE WHEN NEW.status<>OLD.status THEN CASE NEW.status WHEN 'sold' THEN 'Marked sold' WHEN 'deleted' THEN 'Deleted' WHEN 'removed' THEN 'Removed by admin' WHEN 'unavailable' THEN 'Marked unavailable' ELSE 'Made available' END ELSE 'Edited' END,NEW.title);
+END;
+CREATE TRIGGER IF NOT EXISTS activity_login AFTER INSERT ON sessions BEGIN
+ INSERT INTO platform_activity(user_id,action) VALUES (NEW.user_id,'Signed in');
+END;
+CREATE TRIGGER IF NOT EXISTS activity_user_status AFTER UPDATE OF status ON users WHEN NEW.status<>OLD.status BEGIN
+ INSERT INTO platform_activity(user_id,action) VALUES (NEW.id,CASE NEW.status WHEN 'suspended' THEN 'Suspended by admin' ELSE 'Account reactivated' END);
+END;

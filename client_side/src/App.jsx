@@ -1,3 +1,4 @@
+import AdminDashboard from './AdminDashboard';
 import { useState, useEffect, useCallback } from "react";
 import {
   Search,
@@ -28,7 +29,6 @@ import {
   ListingForm,
   Inbox,
   ReportForm,
-  Admin,
 } from "./features";
 import "./App.css";
 import Modal from "./Modal";
@@ -212,6 +212,14 @@ export default function App() {
     [user, setUser] = useState(null),
     [bootError, setBootError] = useState(""),
     [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    const visit = () => { if (document.visibilityState === "visible") api("/activity/visit", {method:"POST",body:{}}).catch(() => {}); };
+    visit();
+    const timer = setInterval(visit, 60000);
+    document.addEventListener("visibilitychange",visit);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange",visit); };
+  }, [user]);
   const [view, setView] = useState("browse"),
     [query, setQuery] = useState(""),
     [category, setCategory] = useState(""),
@@ -414,7 +422,7 @@ export default function App() {
                 Messages
               </button>
               {user.isAdmin && (
-                <button onClick={() => navigate("admin")}>Reports</button>
+                <button onClick={() => navigate("admin")}>Dashboard</button>
               )}
             </nav>
             <div className="header-actions">
@@ -462,7 +470,7 @@ export default function App() {
               report={(id) => setModal({ type: "report", conversationId: id })}
             />
           ) : view === "admin" ? (
-            <Admin notify={notify} />
+            <AdminDashboard notify={notify} />
           ) : (
             <>
               {view === "browse" ? (

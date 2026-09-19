@@ -1,3 +1,4 @@
+import { adminDashboard } from './admin-dashboard.js';
 import { createNotificationMailer, createMessageNotifications } from "./message-notifications.js";
 import express from "express";
 import helmet from "helmet";
@@ -243,6 +244,7 @@ export async function createApp(options = {}) {
     adminEmails.includes(req.user.email)
       ? next()
       : next(fail(403, "Administrator access required."));
+  adminDashboard({ app, db, auth, admin });
   const authLimit = rateLimit({
     keyGenerator: rateLimitKey,
     windowMs: 15 * 60000,

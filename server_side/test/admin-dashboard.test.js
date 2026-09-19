@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createApp} from '../src/app.js';
+import {openDatabase} from '../src/db.js';
+import {randomUUID,createHash} from 'node:crypto';
+test('owner dashboard enforces access, counts distinct sessions, deduplicates visits and audits listing lifecycle',async t=>{
+ const previous=process.env.ADMIN_EMAILS;process.env.ADMIN_EMAILS='owner@nst.rishihood.edu.in';
+ const db=await openDatabase(':memory:');const {app}=await createApp({db,seed:false,devAuth:true});const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ t.after(()=>{server.close();db.close();if(previous===undefined)delete process.env.ADMIN_EMAILS;else process.env.ADMIN_EMAILS=previous;});
+ const add=async(name)=>{const id=randomUUID();await db.prepare('INSERT INTO users(id,email,name,university,verified_at) VALUES (?,?,?,?,?)').run(id,`${name}@nst.rishihood.edu.in`,name,'Test campus',new Date().toISOString());for(const token of [name,name+'2'])await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES (?,?,?)').run(createHash('sha256').update(token).digest('hex'),id,Date.now()+60000);return id;};
+ await add('owner');const seller=await add('student');
+ const req=async(path,token='',method='GET')=>{const r=await fetch(`http://127.0.0.1:${server.address().port}/api${path}`,{method,headers:{cookie:`session=${token}`,'X-Requested-With':'HostelOLX'}});return {status:r.status,body:await r.json()};};
+ assert.equal((await req('/admin/dashboard')).status,401);assert.equal((await req('/admin/dashboard','student')).status,403);
+ await req('/activity/visit','student','POST');await req('/activity/visit','student','POST');
+ const listing=randomUUID();await db.prepare("INSERT INTO listings(id,seller_id,university,title,description,category,price,condition,location) VALUES (?,?,?,'Desk','Study desk','furniture',10000,'Good','Campus')").run(listing,seller,'Test campus');
+ await db.prepare("UPDATE listings SET status='sold',version=version+1 WHERE id=?").run(listing);await db.prepare("UPDATE listings SET status='deleted',version=version+1 WHERE id=?").run(listing);
+ const result=await req('/admin/dashboard','owner');assert.equal(result.status,200);assert.equal(result.body.summary.signedIn,2);assert.equal(result.body.summary.activeToday,1);assert.equal(result.body.summary.online,1);assert.equal(result.body.summary.deleted,1);assert.equal(result.body.daily.length,14);
+ const events=(await req('/admin/dashboard?section=activity','owner')).body.items;assert.deepEqual(events.filter(e=>e.title==='Desk').map(e=>e.action),['Deleted','Marked sold','Listed']);
+ assert.equal((await req('/admin/dashboard?section=users&q=student','owner')).body.total,1);assert.equal((await req('/admin/dashboard?page=-1','owner')).status,422);
+ assert.equal((await db.prepare('SELECT count(*) n FROM user_visits').get()).n,1);
+});

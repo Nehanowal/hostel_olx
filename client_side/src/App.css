@@ -1864,3 +1864,21 @@ button:active:not(:disabled) { transform: scale(.97); }
 .email-preference input { width: 18px; height: 18px; margin: 2px 0; flex-shrink: 0; accent-color: var(--blue); }
 .email-preference strong { display: block; font-size: 14px; }
 .email-preference small { display: block; color: var(--muted); line-height: 1.5; margin-top: 5px; }
+
+.owner-dashboard {max-width:1280px;margin:0 auto;padding:24px 0 60px;}
+.owner-dashboard .page-heading {display:flex;justify-content:space-between;align-items:center;gap:20px;}
+.owner-stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin:24px 0 12px;}
+.owner-stats article {padding:22px 18px;background:white;border:1px solid #e1e6ef;border-radius:16px;display:flex;flex-direction:column;gap:12px;}
+.owner-stats span,.owner-note {color:#657087;font-size:13px;line-height:1.6;}
+.owner-stats strong {font-size:32px;color:#2548da;}
+.owner-trend {padding:24px;background:white;border:1px solid #e1e6ef;border-radius:18px;margin:24px 0;}
+.owner-trend h2 {margin:0;font-size:20px;}.owner-trend p {font-size:13px;color:#657087;}
+.owner-bars {display:flex;align-items:end;gap:12px;overflow:auto;padding-top:15px;}
+.owner-bars>div {flex:1;min-width:35px;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;}
+.owner-bars span {display:block;width:100%;max-width:44px;border-radius:6px 6px 0 0;background:#4264ef;}
+.owner-tabs {display:flex;gap:8px;margin:28px 0 18px;flex-wrap:wrap;}.owner-tabs .selected {background:#284df3;color:white;}
+.owner-search {max-width:440px;margin-bottom:20px;}.owner-table {overflow:auto;background:white;border:1px solid #e1e6ef;border-radius:14px;}
+.owner-table table {width:100%;border-collapse:collapse;text-align:left;font-size:14px;}.owner-table th {background:#f0f3fa;color:#58647c;font-size:12px;text-transform:uppercase;letter-spacing:.04em;}
+.owner-table td,.owner-table th {padding:16px;border-bottom:1px solid #edf0f5;}.owner-table td small {display:block;color:#657087;margin-top:6px;}.owner-table>p {padding:24px;}
+.owner-pagination {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0;font-size:13px;}
+@media(max-width:600px){.owner-dashboard .page-heading{align-items:start}.owner-stats{grid-template-columns:repeat(2,1fr)}.owner-pagination{flex-wrap:wrap}.owner-table td{min-width:120px}}
