@@ -1,6 +1,6 @@
-# Seller message emails
+# Unread message emails
 
-Final Price? can email sellers when a buyer sends an unread message. This is an optional feature, separate from Google login. It uses Brevo's HTTPS API because Render Free blocks SMTP ports.
+Final Price? can email either participant when they receive an unread message. This is an optional feature, separate from Google login. It uses Brevo's HTTPS API because Render Free blocks SMTP ports.
 
 ## Activate on the existing deployment
 
@@ -18,9 +18,9 @@ To turn delivery off without affecting chat, set `MESSAGE_EMAIL_ENABLED=false` a
 
 ## Behavior and reliability
 
-- Only new buyer-to-seller messages create alerts. Seller replies and saves do not send emails. Enabling the feature does not backfill old messages.
-- The first attempt occurs after a 30-second grace period, on the next 15-second worker tick. Messages read before processing are skipped. Timing and final inbox delivery depend on Render and the email provider.
-- Rapid messages in one conversation share one pending alert. Follow-up alerts have a five-minute cooldown per buyer/seller conversation.
+- New buyer messages notify sellers; seller replies notify buyers. Saves do not send emails. Enabling the feature does not backfill old messages.
+- Buyer-to-seller alerts keep their 30-second grace period. Seller-to-buyer reply reminders wait three minutes, on the next 15-second worker tick. Messages read before processing are skipped. Timing and final inbox delivery depend on Render and the email provider.
+- Rapid messages in one conversation share one pending alert. Follow-up alerts have a five-minute cooldown per recipient per conversation.
 - Message insertion and the outbox insert share one database transaction. Retries of the same chat request do not create extra alerts. Chat does not wait for Brevo.
 - Pending jobs persist in Turso. Worker leases prevent concurrent processing, and stable UUID idempotency keys protect provider retries. Transient failures retry up to five times. The retry window is capped at 25 minutes because Brevo documents a 30-minute idempotency window; ambiguous old attempts become failed instead of risking duplicate mail. No system can guarantee both zero loss and zero duplicates across an arbitrary provider outage.
 - Read messages, opt-outs, blocked conversations, suspended users, and removed/deleted listings are checked again before sending. A message already in flight may arrive after an opt-out or read action.

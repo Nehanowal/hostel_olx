@@ -790,7 +790,7 @@ export default function App() {
                   } catch (error) { notify(error.message); }
                   finally { setSavingEmailPreference(false); }
                 }} />
-              <span><strong>Email me about new messages</strong><small>Get an email when a buyer messages you about your listing. Messages you read right away won’t trigger an email.</small></span>
+              <span><strong>Email me about new messages</strong><small>Get emails for unread buyer messages and seller replies. Seller replies wait 3 minutes before reminding you.</small></span>
             </label>}
             <button
               className="secondary full"

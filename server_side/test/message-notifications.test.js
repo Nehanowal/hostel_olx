@@ -157,7 +157,7 @@ test("new buyer messages queue one private seller alert; retries and rapid messa
   assert.equal(
     (await f.db.prepare("SELECT count(*) AS n FROM message_email_outbox").get())
       .n,
-    1,
+    2,
   );
 });
 
@@ -452,4 +452,31 @@ test("two workers cannot claim the same email while its delivery is in flight", 
   assert.equal(sends, 1);
   finish(); await first;
   secondDb.close();
+});
+
+test('seller replies remind buyers after three minutes, deduplicate and respect buyer read status', async t => {
+ const f=await fixture(t);
+ const first=await f.message('seller');
+ f.advance(179999);await f.notifications.drain();assert.equal(f.sent.length,0);
+ await f.request(`/conversations/${f.conversation}/read`,{who:'buyer',method:'POST',body:{lastId:first.body.id}});
+ f.advance(2);await f.notifications.drain();assert.equal(f.sent.length,0);
+ const id=randomUUID();await f.message('seller',id);await f.message('seller',id);await f.message('seller');
+ f.advance(180001);await f.notifications.drain();assert.equal(f.sent.length,1);
+ assert.equal(f.sent[0].payload.to[0].email,'buyer@nst.rishihood.edu.in');
+ assert.match(f.sent[0].payload.textContent,/seller sent you a message/);
+ assert.ok(!f.sent[0].payload.textContent.includes('Private message content'));
+ await f.message('buyer');f.advance(30001);await f.notifications.drain();assert.equal(f.sent.length,2);
+ assert.equal(f.sent[1].payload.to[0].email,'seller@nst.rishihood.edu.in');
+});
+test('buyer opt-out suppresses seller reply reminders',async t=>{
+ const f=await fixture(t);await f.message('seller');
+ await f.request('/me/preferences',{who:'buyer',method:'PATCH',body:{emailNotifications:false}});
+ f.advance(180001);await f.notifications.drain();assert.equal(f.sent.length,0);
+});
+
+test('a fresh seller reply gets three minutes if the previously queued reply was read',async t=>{
+ const f=await fixture(t);const first=await f.message('seller');f.advance(179000);
+ await f.request(`/conversations/${f.conversation}/read`,{who:'buyer',method:'POST',body:{lastId:first.body.id}});
+ await f.message('seller');f.advance(1001);await f.notifications.drain();assert.equal(f.sent.length,0);
+ f.advance(179000);await f.notifications.drain();assert.equal(f.sent.length,1);
 });

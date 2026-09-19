@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 const GRACE_MS = 30_000;
+const REPLY_GRACE_MS = 3 * 60_000;
 const COOLDOWN_MS = 5 * 60_000;
 const LEASE_MS = 60_000;
 const RETRY_WINDOW_MS = 25 * 60_000;
@@ -59,13 +60,13 @@ export function createNotificationMailer({
 function emailPayload(row, origin) {
   const conversationUrl = `${origin}/?conversation=${encodeURIComponent(row.conversation_id)}`;
   const settingsUrl = `${origin}/?account=1`;
-  const subject = "New message about your listing on Final Price?";
-  const sentence = `${row.buyer_name} sent you a message about “${row.title}”.`;
+  const subject = "You have an unread message on Final Price?";
+  const sentence = `${row.sender_name} sent you a message about “${row.title}”.`;
   return {
-    to: [{ email: row.email, name: row.seller_name }],
+    to: [{ email: row.email, name: row.recipient_name }],
     subject,
-    textContent: `Hi ${row.seller_name},\n\n${sentence}\n\nOpen your conversation: ${conversationUrl}\n\nReply on Final Price? to keep the conversation together.\nManage email notifications: ${settingsUrl}`,
-    htmlContent: `<!doctype html><html><body style="margin:0;background:#f3f5f9;font-family:Arial,sans-serif;color:#18203d"><main style="max-width:520px;margin:32px auto;padding:32px;background:white;border-radius:16px"><h1 style="font-size:24px">Final Price<span style="color:#284df3">?</span></h1><p>Hi ${escapeHtml(row.seller_name)},</p><p>${escapeHtml(sentence)}</p><p style="margin:28px 0"><a href="${escapeHtml(conversationUrl)}" style="display:inline-block;background:#284df3;color:white;padding:14px 20px;border-radius:8px;text-decoration:none">Open conversation</a></p><p style="font-size:13px;color:#606878">Reply on Final Price? to keep the conversation together.</p><a href="${escapeHtml(settingsUrl)}" style="font-size:12px;color:#606878">Manage email notifications</a></main></body></html>`,
+    textContent: `Hi ${row.recipient_name},\n\n${sentence}\n\nOpen your conversation: ${conversationUrl}\n\nReply on Final Price? to keep the conversation together.\nManage email notifications: ${settingsUrl}`,
+    htmlContent: `<!doctype html><html><body style="margin:0;background:#f3f5f9;font-family:Arial,sans-serif;color:#18203d"><main style="max-width:520px;margin:32px auto;padding:32px;background:white;border-radius:16px"><h1 style="font-size:24px">Final Price<span style="color:#284df3">?</span></h1><p>Hi ${escapeHtml(row.recipient_name)},</p><p>${escapeHtml(sentence)}</p><p style="margin:28px 0"><a href="${escapeHtml(conversationUrl)}" style="display:inline-block;background:#284df3;color:white;padding:14px 20px;border-radius:8px;text-decoration:none">Open conversation</a></p><p style="font-size:13px;color:#606878">Reply on Final Price? to keep the conversation together.</p><a href="${escapeHtml(settingsUrl)}" style="font-size:12px;color:#606878">Manage email notifications</a></main></body></html>`,
   };
 }
 
@@ -82,17 +83,24 @@ export function createMessageNotifications({
   let running = false;
   let timer;
   async function enqueue(conversation, message) {
-    if (!mailer || message.sender_id === conversation.seller_id) return;
+    if (!mailer || ![conversation.buyer_id, conversation.seller_id].includes(message.sender_id)) return;
+    const recipient = message.sender_id === conversation.seller_id ? conversation.buyer_id : conversation.seller_id;
+    const grace = recipient === conversation.buyer_id ? REPLY_GRACE_MS : GRACE_MS;
+    // A fresh reply gets a full grace period when the prior queued message was read.
+    await run(
+      `UPDATE message_email_outbox SET status='skipped' WHERE conversation_id=? AND recipient_id=? AND status='pending' AND attempts=0 AND message_id<=coalesce((SELECT last_id FROM conversation_reads WHERE conversation_id=? AND user_id=?),0)`,
+      conversation.id, recipient, conversation.id, recipient,
+    );
     await run(
       `INSERT OR IGNORE INTO message_email_outbox(id,conversation_id,recipient_id,message_id,created_at,due_at)
       SELECT ?,?,?,?, ?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND email_notifications=1 AND status='active')`,
       randomUUID(),
       conversation.id,
-      conversation.seller_id,
+      recipient,
       message.id,
       now(),
-      now() + GRACE_MS,
-      conversation.seller_id,
+      now() + grace,
+      recipient,
     );
   }
   async function claim() {
@@ -109,13 +117,14 @@ export function createMessageNotifications({
       if (!job) return null;
       const row = await get(
         `SELECT c.id AS conversation_id,l.title,l.status AS listing_status,
-        s.email,s.name AS seller_name,s.status AS seller_status,s.email_notifications,
-        b.name AS buyer_name,b.status AS buyer_status,
+        r.email,r.name AS recipient_name,r.email_notifications,
+        s.status AS seller_status,b.status AS buyer_status,
+        CASE WHEN r.id=c.seller_id THEN b.name ELSE s.name END AS sender_name,
         EXISTS(SELECT 1 FROM blocks WHERE (blocker_id=c.buyer_id AND blocked_id=c.seller_id) OR (blocker_id=c.seller_id AND blocked_id=c.buyer_id)) AS blocked,
-        (SELECT max(id) FROM messages WHERE conversation_id=c.id AND sender_id=c.buyer_id) AS latest_message,
-        coalesce((SELECT last_id FROM conversation_reads WHERE conversation_id=c.id AND user_id=c.seller_id),0) AS last_read
-        FROM conversations c JOIN listings l ON l.id=c.listing_id JOIN users s ON s.id=c.seller_id JOIN users b ON b.id=c.buyer_id
-        WHERE c.id=? AND c.seller_id=?`,
+        (SELECT max(id) FROM messages WHERE conversation_id=c.id AND sender_id<>r.id) AS latest_message,
+        coalesce((SELECT last_id FROM conversation_reads WHERE conversation_id=c.id AND user_id=r.id),0) AS last_read
+        FROM conversations c JOIN listings l ON l.id=c.listing_id JOIN users s ON s.id=c.seller_id JOIN users b ON b.id=c.buyer_id JOIN users r ON r.id IN (c.buyer_id,c.seller_id)
+        WHERE c.id=? AND r.id=?`,
         job.conversation_id,
         job.recipient_id,
       );
