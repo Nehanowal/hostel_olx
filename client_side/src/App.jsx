@@ -229,6 +229,23 @@ export default function App() {
   const [modal, setModal] = useState(null),
     [toast, setToast] = useState(""),
     [conversationId, setConversationId] = useState(null);
+  const [savingEmailPreference, setSavingEmailPreference] = useState(false);
+  const applyEmailLink = useCallback((currentUser) => {
+    if (!currentUser?.id) return;
+    const url = new URL(window.location.href);
+    const conversation = url.searchParams.get("conversation");
+    if (conversation && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(conversation)) {
+      setConversationId(conversation);
+      setView("inbox");
+      url.searchParams.delete("conversation");
+      window.history.replaceState(null, "", url);
+    }
+    if (url.searchParams.get("account") === "1") {
+      setModal({ type: "account" });
+      url.searchParams.delete("account");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
   const grid = useListingActivity(items, user?.id, loading, !!modal);
   const close = useCallback(() => setModal(null), []);
   const notify = useCallback((message) => setToast(message), []);
@@ -260,10 +277,11 @@ export default function App() {
       .then(([c, m]) => {
         setConfig(c);
         setUser(m.user);
+        applyEmailLink(m.user);
         setReady(true);
       })
       .catch((e) => setBootError(e.message));
-  }, []);
+  }, [applyEmailLink]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4500);
@@ -431,7 +449,7 @@ export default function App() {
         </div>
       )}
       {!user ? (
-        <SignIn config={config} onLogin={(nextUser) => { navigate("browse"); setSort("recommended"); setConversationId(null); setUser(nextUser); }} />
+        <SignIn config={config} onLogin={(nextUser) => { navigate("browse"); setSort("recommended"); setConversationId(null); setUser(nextUser); applyEmailLink(nextUser); }} />
       ) : (
         <main className="workspace">
           {view === "inbox" ? (
@@ -752,6 +770,20 @@ export default function App() {
                 ? "Local test account — email ownership has not been verified."
                 : user.authMethod === "google" ? "Official university Google account verified." : "University email verified."}
             </div>
+            {user.emailNotificationsAvailable && <label className="email-preference">
+              <input type="checkbox" checked={user.emailNotifications} disabled={savingEmailPreference}
+                onChange={async e => {
+                  const value = e.target.checked;
+                  setSavingEmailPreference(true);
+                  try {
+                    const result = await api("/me/preferences", { method: "PATCH", body: { emailNotifications: value } });
+                    setUser(current => ({ ...current, emailNotifications: result.emailNotifications }));
+                    notify(value ? "Message emails enabled" : "Message emails turned off");
+                  } catch (error) { notify(error.message); }
+                  finally { setSavingEmailPreference(false); }
+                }} />
+              <span><strong>Email me about new messages</strong><small>Get an email when a buyer messages you about your listing. Messages you read right away won’t trigger an email.</small></span>
+            </label>}
             <button
               className="secondary full"
               onClick={async () => {

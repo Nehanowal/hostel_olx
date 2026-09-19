@@ -135,6 +135,16 @@ export async function openDatabase(path, env = process.env) {
             "ALTER TABLE listings ADD COLUMN opens INTEGER NOT NULL DEFAULT 0 CHECK(opens >= 0)",
           )
           .run();
+      if (
+        !(await db.prepare("PRAGMA table_info(users)").all()).some(
+          (c) => c.name === "email_notifications",
+        )
+      )
+        await db
+          .prepare(
+            "ALTER TABLE users ADD COLUMN email_notifications INTEGER NOT NULL DEFAULT 1 CHECK(email_notifications IN (0,1))",
+          )
+          .run();
     });
     return db;
   } catch (error) {

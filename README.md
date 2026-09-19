@@ -4,6 +4,8 @@ A working, local-first student marketplace for **Rishihood University**, accepti
 
 ## Latest improvements
 
+- Optional seller email alerts for unread buyer messages, with account opt-out, a durable Turso outbox, retry protection and direct conversation links. [Activate Brevo email notifications](docs/MESSAGE-EMAILS.md).
+
 - Scroll reveals, card hover effects, button feedback, animated dialog opening/closing, image lightbox with zoom and keyboard controls, and reduced-motion support.
 - **Final Price?** branding, a light cool-grey canvas, blue “Big finds. Small prices.” hero, and self-hosted DM Sans / Space Grotesk fonts.
 - **Popular on campus** rotates one available student listing at a time inside the hero. It ranks up to 12 items by deliberate detail opens, with newest-first ties. Rotation pauses on hover, keyboard focus, open dialogs and hidden tabs; reduced-motion users get manual navigation. No popularity counts appear in the interface.

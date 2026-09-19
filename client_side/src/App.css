@@ -1859,3 +1859,8 @@ button:active:not(:disabled) { transform: scale(.97); }
 
 .brand, .hero-copy h1, .signin-story h1, .footer-brand { font-family: "Space Grotesk", "Segoe UI", sans-serif; }
 .hero-copy h1 { font-weight: 700; }
+
+.email-preference { display: flex; flex-direction: row; align-items: flex-start; gap: 12px; margin: 20px 0; padding: 16px; background: #f3f5f9; border-radius: 12px; text-align: left; }
+.email-preference input { width: 18px; height: 18px; margin: 2px 0; flex-shrink: 0; accent-color: var(--blue); }
+.email-preference strong { display: block; font-size: 14px; }
+.email-preference small { display: block; color: var(--muted); line-height: 1.5; margin-top: 5px; }

@@ -1,3 +1,4 @@
+import { createNotificationMailer, createMessageNotifications } from "./message-notifications.js";
 import express from "express";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -133,6 +134,10 @@ export async function createApp(options = {}) {
           : {}),
       })
     : null;
+  const notifications = createMessageNotifications({ db, origin,
+    mailer: options.notificationMailer === undefined ? createNotificationMailer() : options.notificationMailer,
+    now: options.notificationNow,
+  });
   const userDto = (user) => ({
     id: user.id,
     name: user.name,
@@ -141,6 +146,8 @@ export async function createApp(options = {}) {
     campus: user.campus,
     authMethod: user.auth_method,
     isAdmin: adminEmails.includes(user.email),
+    emailNotifications: user.email_notifications !== 0,
+    emailNotificationsAvailable: notifications.enabled,
   });
   const run = async (sql, ...args) => await db.prepare(sql).run(...args);
   const get = async (sql, ...args) => await db.prepare(sql).get(...args);
@@ -365,6 +372,12 @@ export async function createApp(options = {}) {
   app.get("/api/me", (req, res) =>
     res.json({ user: req.user ? userDto(req.user) : null }),
   );
+  app.patch("/api/me/preferences", auth, async (req, res) => {
+    const { emailNotifications } = z.object({ emailNotifications: z.boolean() }).strict().parse(req.body);
+    await run("UPDATE users SET email_notifications=? WHERE id=?", emailNotifications ? 1 : 0, req.user.id);
+    res.json({ emailNotifications });
+  });
+
   app.post("/api/auth/request", authLimit, async (req, res) => {
     if (googleOnly)
       throw fail(
@@ -962,23 +975,16 @@ export async function createApp(options = {}) {
         .object({ body: text(1, 2000), clientId: z.uuid() })
         .parse(req.body);
       const message = await transaction(async () => {
-        await run(
-          "INSERT OR IGNORE INTO messages(conversation_id,sender_id,client_id,body) VALUES (?,?,?,?)",
-          c.id,
-          req.user.id,
-          clientId,
-          body,
+        const inserted = await get(
+          "INSERT OR IGNORE INTO messages(conversation_id,sender_id,client_id,body) VALUES (?,?,?,?) RETURNING *",
+          c.id, req.user.id, clientId, body,
         );
-        await run(
-          "UPDATE conversations SET updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
-          c.id,
-        );
-        return await get(
-          "SELECT * FROM messages WHERE conversation_id=? AND sender_id=? AND client_id=?",
-          c.id,
-          req.user.id,
-          clientId,
-        );
+        if (inserted) {
+          await run("UPDATE conversations SET updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?", c.id);
+          await notifications.enqueue(c, inserted);
+          return inserted;
+        }
+        return await get("SELECT * FROM messages WHERE conversation_id=? AND sender_id=? AND client_id=?", c.id, req.user.id, clientId);
       });
       res.status(201).json(message);
     },
@@ -1143,5 +1149,5 @@ export async function createApp(options = {}) {
         status >= 500 ? "Service unavailable. Please try again." : err.message,
     });
   });
-  return { app, db };
+  return { app, db, notifications };
 }

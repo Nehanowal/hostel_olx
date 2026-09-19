@@ -83,3 +83,13 @@ CREATE TABLE IF NOT EXISTS listing_opens (
  listing_id TEXT NOT NULL REFERENCES listings(id), viewer_id TEXT NOT NULL REFERENCES users(id),
  day TEXT NOT NULL, PRIMARY KEY(listing_id,viewer_id,day)
 );
+CREATE TABLE IF NOT EXISTS message_email_outbox (
+ id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id),
+ recipient_id TEXT NOT NULL REFERENCES users(id), message_id INTEGER UNIQUE NOT NULL REFERENCES messages(id),
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sending','sent','skipped','failed')),
+ created_at INTEGER NOT NULL, due_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
+ first_attempt_at INTEGER, lease_until INTEGER, lease_token TEXT, sent_at INTEGER,
+ payload TEXT, last_error TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_message_email_active ON message_email_outbox(conversation_id,recipient_id) WHERE status IN ('pending','sending');
+CREATE INDEX IF NOT EXISTS idx_message_email_due ON message_email_outbox(status,due_at);

@@ -1,5 +1,7 @@
 # Dashboard: New > Blueprint > select this repository. Choose Free.
 # Enter the requested secrets there; never put their real values in this file.
+# Optional seller email: add MESSAGE_EMAIL_ENABLED=true, MESSAGE_EMAIL_FROM and
+# BREVO_API_KEY in Render after Brevo verification (docs/MESSAGE-EMAILS.md).
 services:
   - type: web
     name: hostel-olx-api
