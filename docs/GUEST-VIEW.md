@@ -1,6 +1,6 @@
 # Guest browsing
 
-Share `https://hostel-olx.vercel.app/?guest=1` for direct guest access, or select **Explore as a guest** on the sign-in page.
+The standalone guest page and **Explore as a guest** entry have been removed. Old `?guest=1` links show the normal college sign-in page. Public browsing endpoints remain in use by the student demo described below.
 
 Guests can search, filter and preview photos of active, non-demo listings from active sellers in the configured university. The public API explicitly returns only listing ID, title, category, condition, price, creation date and guest photo URLs. Seller identities, emails, descriptions, custom attributes and exact meetup-location fields are excluded. Photos are shown as uploaded; text or identifying details embedded in a photo or title remain visible.
 
