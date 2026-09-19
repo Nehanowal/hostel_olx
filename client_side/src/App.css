@@ -1771,7 +1771,8 @@ button:active:not(:disabled) { transform: scale(.97); }
 .spotlight-dot { width: 7px; height: 7px; background: #f4ee8c; border-radius: 50%; }
 .spotlight-card { display: block; text-align: left; padding: 8px; border-radius: 14px; background: #fff; color: var(--ink); width: 100%; box-shadow: 0 14px 30px #101b3433; }
 .spotlight-photo { height: 190px; position: relative; display: grid; place-items: center; background: #e9edf4; border-radius: 9px; overflow: hidden; animation: spotlight-pop 500ms ease both; }
-.spotlight-photo img { width: 100%; height: 100%; object-fit: contain; }
+/* Keep intrinsic portrait dimensions from expanding the grid row past its frame. */
+.spotlight-photo img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
 .spotlight-photo > span { position: absolute; bottom: 10px; left: 10px; border-radius: 5px; background: #f4ee8c; color: #18203d; padding: 5px 9px; font-size: 11px; }
 .spotlight-info { display: flex; align-items: center; gap: 12px; padding: 14px 6px 8px; }
 .spotlight-info > div { min-width: 0; flex: 1; }
