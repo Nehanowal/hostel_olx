@@ -121,3 +121,20 @@ END;
 CREATE TRIGGER IF NOT EXISTS activity_user_status AFTER UPDATE OF status ON users WHEN NEW.status<>OLD.status BEGIN
  INSERT INTO platform_activity(user_id,action) VALUES (NEW.id,CASE NEW.status WHEN 'suspended' THEN 'Suspended by admin' ELSE 'Account reactivated' END);
 END;
+
+CREATE TABLE IF NOT EXISTS product_subscriptions (
+ user_id TEXT PRIMARY KEY REFERENCES users(id), enabled INTEGER NOT NULL DEFAULT 0,
+ unsubscribe_token TEXT UNIQUE NOT NULL, opted_at INTEGER NOT NULL,
+ last_attempt INTEGER, last_sent INTEGER, last_cutoff INTEGER
+);
+CREATE TABLE IF NOT EXISTS product_batches (day TEXT PRIMARY KEY,created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS product_email_jobs (
+ id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),day TEXT NOT NULL REFERENCES product_batches(day),
+ cutoff INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',due_at INTEGER NOT NULL,
+ attempts INTEGER NOT NULL DEFAULT 0,first_attempt INTEGER,lease_until INTEGER,payload TEXT,
+ UNIQUE(user_id,day)
+);
+CREATE INDEX IF NOT EXISTS idx_product_jobs_due ON product_email_jobs(status,due_at);
+CREATE TABLE IF NOT EXISTS product_send_slots (
+ day TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id),PRIMARY KEY(day,user_id)
+);

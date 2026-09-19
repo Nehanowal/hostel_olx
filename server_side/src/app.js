@@ -1,3 +1,4 @@
+import { createProductUpdates, productUpdateRoutes } from './product-updates.js';
 import { adminDashboard } from './admin-dashboard.js';
 import { createNotificationMailer, createMessageNotifications } from "./message-notifications.js";
 import express from "express";
@@ -135,10 +136,9 @@ export async function createApp(options = {}) {
           : {}),
       })
     : null;
-  const notifications = createMessageNotifications({ db, origin,
-    mailer: options.notificationMailer === undefined ? createNotificationMailer() : options.notificationMailer,
-    now: options.notificationNow,
-  });
+  const notificationMailer = options.notificationMailer === undefined ? createNotificationMailer() : options.notificationMailer;
+  const notifications = createMessageNotifications({ db, origin, mailer: notificationMailer, now: options.notificationNow });
+  const productUpdates = createProductUpdates({ db, origin, mailer: notificationMailer, now: options.notificationNow });
   const userDto = (user) => ({
     id: user.id,
     name: user.name,
@@ -245,6 +245,7 @@ export async function createApp(options = {}) {
       ? next()
       : next(fail(403, "Administrator access required."));
   adminDashboard({ app, db, auth, admin });
+  productUpdateRoutes({app,db,auth,updates:productUpdates});
   const authLimit = rateLimit({
     keyGenerator: rateLimitKey,
     windowMs: 15 * 60000,
@@ -1151,5 +1152,5 @@ export async function createApp(options = {}) {
         status >= 500 ? "Service unavailable. Please try again." : err.message,
     });
   });
-  return { app, db, notifications };
+  return { app, db, notifications, productUpdates };
 }

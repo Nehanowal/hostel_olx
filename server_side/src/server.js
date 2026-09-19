@@ -1,5 +1,5 @@
 import { createApp } from "./app.js";
-const { app, db, notifications } = await createApp();
+const { app, db, notifications, productUpdates } = await createApp();
 const host =
   process.env.HOST ||
   (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
@@ -14,10 +14,12 @@ const server = app.listen(Number(process.env.PORT || 3001), host, () =>
   console.log(`Hostel OLX API: http://${host}:${process.env.PORT || 3001}`),
 );
 notifications.start();
+productUpdates.start();
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () =>
     server.close(() => {
       notifications.stop();
+      productUpdates.stop();
       db.close();
       process.exit(0);
     }),

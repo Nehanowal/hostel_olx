@@ -12,12 +12,13 @@ export function adminDashboard({app,db,auth,admin}) {
     const scope=req.user.university;
     const summary=await get(`SELECT
       (SELECT count(*) FROM users WHERE university=?) users,
+      (SELECT count(*) FROM product_subscriptions p JOIN users u ON u.id=p.user_id WHERE u.university=? AND p.enabled=1) productSubscribers,
       (SELECT count(DISTINCT s.user_id) FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.university=? AND u.status='active' AND s.expires_at>?) signedIn,
       (SELECT count(DISTINCT v.user_id) FROM user_visits v JOIN users u ON u.id=v.user_id WHERE u.university=? AND v.day=date('now')) activeToday,
       (SELECT count(DISTINCT v.user_id) FROM user_visits v JOIN users u ON u.id=v.user_id WHERE u.university=? AND v.last_seen>=?) online,
       (SELECT count(*) FROM listings WHERE university=? AND is_demo=0 AND status='active') activeListings,
       (SELECT count(*) FROM listings WHERE university=? AND is_demo=0 AND status='sold') sold,
-      (SELECT count(*) FROM listings WHERE university=? AND is_demo=0 AND status='deleted') deleted`,scope,scope,Date.now(),scope,scope,Date.now()-300000,scope,scope,scope);
+      (SELECT count(*) FROM listings WHERE university=? AND is_demo=0 AND status='deleted') deleted`,scope,scope,scope,Date.now(),scope,scope,Date.now()-300000,scope,scope,scope);
     const daily=await all(`WITH RECURSIVE days(day) AS (SELECT date('now','-13 days') UNION ALL SELECT date(day,'+1 day') FROM days WHERE day<date('now')) SELECT days.day,count(DISTINCT u.id) users FROM days LEFT JOIN user_visits v ON v.day=days.day LEFT JOIN users u ON u.id=v.user_id AND u.university=? GROUP BY days.day ORDER BY days.day`,scope);
     let base,select,order;
     if(section==='users'){

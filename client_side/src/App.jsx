@@ -1,3 +1,4 @@
+import { ProductUpdatePreference, ProductUnsubscribe } from './ProductUpdates';
 import AdminDashboard from './AdminDashboard';
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -208,6 +209,10 @@ function SignIn({ config, onLogin }) {
 }
 
 export default function App() {
+  const token = new URLSearchParams(window.location.search).get('unsubscribeUpdates');
+  return token ? <ProductUnsubscribe token={token}/> : <MarketplaceApp/>;
+}
+function MarketplaceApp() {
   const [config, setConfig] = useState(null),
     [user, setUser] = useState(null),
     [bootError, setBootError] = useState(""),
@@ -778,6 +783,7 @@ export default function App() {
                 ? "Local test account — email ownership has not been verified."
                 : user.authMethod === "google" ? "Official university Google account verified." : "University email verified."}
             </div>
+            <ProductUpdatePreference notify={notify}/>
             {user.emailNotificationsAvailable && <label className="email-preference">
               <input type="checkbox" checked={user.emailNotifications} disabled={savingEmailPreference}
                 onChange={async e => {
