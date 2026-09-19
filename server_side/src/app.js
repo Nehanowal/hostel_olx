@@ -552,6 +552,7 @@ export async function createApp(options = {}) {
       .total;
     const sort = {
       recommended:
+        (q.view === "browse" && !q.category ? "CASE WHEN l.category='Fashion' THEN 1 ELSE 0 END ASC," : "") +
         "l.is_demo ASC,CASE WHEN l.created_at>=? THEN 0 ELSE 1 END ASC,CASE WHEN l.created_at>=? THEN l.created_at END DESC,l.opens DESC,l.created_at DESC,l.id DESC",
       popular: "l.opens DESC,l.created_at DESC,l.id DESC",
       newest: "l.created_at DESC,l.id DESC",

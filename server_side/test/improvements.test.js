@@ -715,3 +715,14 @@ test("existing databases gain click tracking without losing listings or impressi
   assert.deepEqual(await db.prepare("SELECT * FROM listing_opens").all(), []);
   db.close();
 });
+
+test('All finds recommends non-fashion before fashion across pages while explicit sorts and category filters still work',async t=>{
+ const {db,request,login}=await fixture(t);const seller=await login('Seller');const buyer=await login('Buyer');
+ const add=async(category,hours,index)=>{const id=randomUUID();await db.prepare('INSERT INTO listings(id,seller_id,university,title,description,category,price,condition,location,created_at,opens) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(id,seller.body.user.id,seller.body.user.university,`${category} item ${index}`,'Campus item',category,100,'Good','Campus',new Date(Date.now()-hours*3600000).toISOString(),category==='Fashion'?100:0);return id;};
+ const fashion=await add('Fashion',0,0);for(let i=0;i<25;i++)await add('Other',80+i,i);
+ const first=await request('/listings',{cookie:buyer.cookie});assert.equal(first.body.items.length,24);assert.ok(first.body.items.every(x=>x.category!=='Fashion'));
+ const second=await request('/listings?page=2',{cookie:buyer.cookie});assert.equal(second.body.items.length,2);assert.equal(second.body.items[1].id,fashion);
+ assert.equal((await request('/listings?sort=newest',{cookie:buyer.cookie})).body.items[0].id,fashion);
+ assert.equal((await request('/listings?sort=popular',{cookie:buyer.cookie})).body.items[0].id,fashion);
+ assert.deepEqual((await request('/listings?category=Fashion',{cookie:buyer.cookie})).body.items.map(x=>x.id),[fashion]);
+});
