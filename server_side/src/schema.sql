@@ -138,3 +138,7 @@ CREATE INDEX IF NOT EXISTS idx_product_jobs_due ON product_email_jobs(status,due
 CREATE TABLE IF NOT EXISTS product_send_slots (
  day TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id),PRIMARY KEY(day,user_id)
 );
+CREATE TABLE IF NOT EXISTS rate_limit_counters (
+ key TEXT PRIMARY KEY,hits INTEGER NOT NULL,reset_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rate_limit_expiry ON rate_limit_counters(reset_at);

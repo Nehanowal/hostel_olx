@@ -1,8 +1,10 @@
-# Deploy Hostel OLX: Vercel + Render + Turso + Cloudinary
+# Previous deployment: Vercel + Render + Turso + Cloudinary
+
+**Superseded on September 21, 2026:** the frontend and backend now run together on Vercel. Follow [VERCEL-BACKEND.md](VERCEL-BACKEND.md) for the current configuration. The instructions below record the previous Render setup for rollback; do not apply its project-root or proxy settings to the current deployment.
 
 This guide uses the free plans for a campus pilot. The production services below are deployed. The numbered steps document their configuration and how to reproduce it. Production started with an **empty database**; existing local data and photos have not been migrated.
 
-## Current deployment
+## Previous deployment
 
 | Resource | Production value |
 | --- | --- |

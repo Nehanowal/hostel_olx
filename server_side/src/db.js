@@ -1,5 +1,6 @@
 import { createClient } from "@libsql/client";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -15,9 +16,9 @@ export async function openDatabase(path, env = process.env) {
     throw new Error("TURSO_AUTH_TOKEN is required with TURSO_DATABASE_URL.");
   if (remote && !/^(libsql|https):\/\//.test(env.TURSO_DATABASE_URL))
     throw new Error("TURSO_DATABASE_URL must be a libsql:// or https:// URL.");
-  if (!remote && path === undefined && env.RENDER === "true")
+  if (!remote && path === undefined && (env.RENDER === "true" || env.VERCEL === "1"))
     throw new Error(
-      "Render requires TURSO_DATABASE_URL and TURSO_AUTH_TOKEN; local SQLite is not persistent on the free tier.",
+      "Hosted deployments require TURSO_DATABASE_URL and TURSO_AUTH_TOKEN; local SQLite is not persistent.",
     );
   path ??= env.DATABASE_PATH || resolve(root, "data/marketplace.sqlite");
   if (!remote && path !== ":memory:")
@@ -101,9 +102,12 @@ export async function openDatabase(path, env = process.env) {
       throw new Error(
         "The database connection must enforce foreign keys. Use a Turso Cloud libSQL database with foreign-key enforcement enabled.",
       );
-    await db.exec(
-      readFileSync(new URL("./schema.sql", import.meta.url), "utf8"),
-    );
+    const schema = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
+    // Bump the suffix when changing the additive migrations below.
+    const schemaVersion = createHash("sha256").update(schema + ":migrations-v1").digest("hex");
+    const metadataExists = await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='platform_metadata'").get();
+    if (remote && metadataExists && (await db.prepare("SELECT value FROM platform_metadata WHERE key='schema_version'").get())?.value === schemaVersion) return db;
+    await db.exec(schema);
     await db.transaction(async () => {
       if (
         !(await db.prepare("PRAGMA table_info(sessions)").all()).some(
@@ -146,6 +150,7 @@ export async function openDatabase(path, env = process.env) {
           )
           .run();
     });
+    await db.prepare("INSERT INTO platform_metadata(key,value) VALUES ('schema_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(schemaVersion);
     return db;
   } catch (error) {
     db.close();

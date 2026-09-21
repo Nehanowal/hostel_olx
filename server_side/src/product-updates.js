@@ -46,9 +46,9 @@ export function createProductUpdates({db,mailer,origin,now=Date.now,logger=conso
   await run("UPDATE product_email_jobs SET status='sending',lease_until=?,first_attempt=coalesce(first_attempt,?),attempts=attempts+1,payload=? WHERE id=?",time+60000,time,payload,job.id);
   return {...job,payload:JSON.parse(payload)};
  });}
- async function drain(){if(!mailer||running)return;running=true;try{
+ async function drain({limit=30}={}){if(!mailer||running)return;running=true;try{
   await schedule();
-  for(let i=0;i<30;i++){
+  for(let i=0;i<limit;i++){
    const job=await claim();if(!job)break;if(job.skip)continue;
    try{await mailer.send(job.payload,job.id);await db.transaction(async()=>{await run("UPDATE product_email_jobs SET status='sent',payload=NULL WHERE id=?",job.id);await run('UPDATE product_subscriptions SET last_sent=?,last_cutoff=? WHERE user_id=?',now(),job.cutoff,job.user_id);});}
    catch(error){const retry=error.retryable!==false&&job.attempts<4;await run("UPDATE product_email_jobs SET status=?,due_at=?,payload=CASE WHEN ? THEN payload ELSE NULL END WHERE id=?",retry?'pending':'failed',now()+60000*2**job.attempts,retry?1:0,job.id);logger.warn('Product update delivery deferred',{jobId:job.id,retry});}

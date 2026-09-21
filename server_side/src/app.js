@@ -24,6 +24,7 @@ import { categories, conditions, seedDemo } from "./catalog.js";
 import { googleAuth } from "./google-auth.js";
 import { createImageStorage } from "./image-storage.js";
 import { configureProxy, rateLimitKey } from "./proxy.js";
+import { DatabaseRateLimitStore } from "./rate-limit-store.js";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -48,6 +49,7 @@ export async function createApp(options = {}) {
   configureProxy(app);
   const production =
     options.production ?? process.env.NODE_ENV === "production";
+  const serverless = process.env.VERCEL === "1";
   const googleClientId =
     options.googleClientId ?? process.env.GOOGLE_CLIENT_ID ?? "";
   const googleOnly = !!googleClientId;
@@ -100,9 +102,9 @@ export async function createApp(options = {}) {
     throw new Error(
       "APP_ORIGIN must be the website origin without a path, query, fragment or credentials.",
     );
-  if (process.env.RENDER === "true" && (!production || !googleOnly))
+  if ((process.env.RENDER === "true" || serverless) && (!production || !googleOnly))
     throw new Error(
-      "Render requires NODE_ENV=production and GOOGLE_CLIENT_ID; its free tier blocks SMTP ports.",
+      "Hosted deployments require NODE_ENV=production and GOOGLE_CLIENT_ID.",
     );
   const imageStorage = options.imageStorage || createImageStorage({ uploads });
   const db = options.db || (await openDatabase());
@@ -213,6 +215,7 @@ export async function createApp(options = {}) {
   app.use(
     "/api",
     rateLimit({
+      ...(serverless ? { store: new DatabaseRateLimitStore(db, "api") } : {}),
       keyGenerator: rateLimitKey,
       windowMs: 60000,
       limit: 300,
@@ -249,6 +252,7 @@ export async function createApp(options = {}) {
   adminDashboard({ app, db, auth, admin });
   productUpdateRoutes({app,db,auth,updates:productUpdates});
   const authLimit = rateLimit({
+    ...(serverless ? { store: new DatabaseRateLimitStore(db, "auth") } : {}),
     keyGenerator: rateLimitKey,
     windowMs: 15 * 60000,
     limit: 15,
@@ -257,6 +261,7 @@ export async function createApp(options = {}) {
     message: { error: "Too many sign-in attempts. Try again in 15 minutes." },
   });
   const sendLimit = rateLimit({
+    ...(serverless ? { store: new DatabaseRateLimitStore(db, "send") } : {}),
     keyGenerator: rateLimitKey,
     windowMs: 60000,
     limit: 40,
@@ -992,6 +997,8 @@ export async function createApp(options = {}) {
         }
         return await get("SELECT * FROM messages WHERE conversation_id=? AND sender_id=? AND client_id=?", c.id, req.user.id, clientId);
       });
+      // Publication follows commit so a queue worker can see the durable job.
+      options.onMessageCommitted?.();
       res.status(201).json(message);
     },
   );

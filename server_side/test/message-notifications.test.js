@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../src/app.js";
 import { openDatabase } from "../src/db.js";
+import { createJobDispatcher } from "../src/job-dispatcher.js";
 import {
   createNotificationMailer,
   createMessageNotifications,
@@ -79,6 +80,7 @@ async function fixture(t, options = {}) {
     uploads: join(dir, "uploads"),
     notificationMailer: options.disabled ? null : mailer,
     notificationNow: () => clock,
+    onMessageCommitted: () => options.onMessageCommitted?.(db),
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -125,6 +127,45 @@ async function fixture(t, options = {}) {
     now: () => clock,
   };
 }
+
+test("Vercel queues retain the three-minute reply delay and only publish after commit", async (t) => {
+  const committed = Promise.withResolvers();
+  const f = await fixture(t, { onMessageCommitted: db => {
+    db.prepare("SELECT count(*) n FROM message_email_outbox WHERE status='pending'").get().then(committed.resolve, committed.reject);
+  } });
+  const published = [];
+  const jobs = createJobDispatcher({ db: f.db, notifications: f.notifications, now: f.now,
+    publish: async (...args) => published.push(args) });
+  assert.equal((await f.message("seller")).status, 201);
+  assert.equal((await committed.promise).n, 1);
+  await jobs.wake("messages");
+  assert.deepEqual(published[0][1], { kind: "messages" });
+  assert.equal(published[0][2].delaySeconds, 180);
+  f.advance(180000);
+  await jobs.processJob({kind:"messages"});
+  assert.equal(f.sent.length, 1);
+  await jobs.processJob({kind:"messages"});
+  assert.equal(f.sent.length, 1, "redelivering a queue callback must not send a duplicate email");
+  assert.equal(published.length, 1, "a drained outbox stops scheduling work");
+});
+
+test("Vercel queue reschedules provider backoff and still honors a later read", async (t) => {
+  let attempts = 0;
+  const f = await fixture(t, {mailer: {send: async () => { attempts++; throw new Error("Temporary provider failure"); }}});
+  const published = [];
+  const jobs = createJobDispatcher({db:f.db,notifications:f.notifications,now:f.now,publish:async (...args)=>published.push(args)});
+  await f.message();
+  f.advance(30000);
+  await jobs.processJob({kind:"messages"});
+  assert.equal(attempts, 1);
+  assert.equal(published[0][2].delaySeconds, 60);
+  const message = await f.db.prepare("SELECT max(id) id FROM messages").get();
+  await f.request(`/conversations/${f.conversation}/read`, {who:"seller",method:"POST",body:{lastId:message.id}});
+  f.advance(60000);
+  await jobs.processJob({kind:"messages"});
+  assert.equal(attempts, 1);
+  assert.equal((await f.db.prepare("SELECT status FROM message_email_outbox").get()).status, "skipped");
+});
 
 test("new buyer messages queue one private seller alert; retries and rapid messages do not duplicate it", async (t) => {
   const f = await fixture(t);

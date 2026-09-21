@@ -1,0 +1,13 @@
+node_modules
+server_side/node_modules
+client_side/node_modules
+server_side/data
+server_side/uploads
+server_side/test
+client_side/test
+client_side/dist
+docs
+.env*
+**/.env*
+**/.vercel
+.git

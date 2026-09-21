@@ -73,7 +73,7 @@ Then open **http://127.0.0.1:3001**. This is still a local preview unless produc
 | Chat           | Durable REST API with 3-second active-thread / 5-second inbox polling |
 | Tests          | Node test runner, real HTTP requests and isolated SQLite database     |
 
-The deployment configuration uses Vercel for the frontend, Render for the backend, Turso for durable SQLite-compatible data, and Cloudinary for photos. Local development still works without cloud credentials. See the **[step-by-step deployment guide](docs/DEPLOYMENT.md)**.
+The deployment configuration uses Vercel for both the frontend and backend, Turso for durable SQLite-compatible data, and Cloudinary for photos. Local development still works without cloud credentials. See **[the Vercel backend guide](docs/VERCEL-BACKEND.md)**.
 
 ## Data and configuration
 
@@ -92,7 +92,7 @@ Copy `server_side/.env.example` to `server_side/.env` only if changing defaults.
 
 See [the setup guide](docs/GOOGLE-AND-DATABASE-SETUP.md) for exact Google console steps and environment values. Setting `GOOGLE_CLIENT_ID` automatically requires Google login and rejects OTP and local-test sessions. Without a client ID, the original local test login remains available; real email OTP can alternatively be enabled with `DEV_AUTH=false` and SMTP configuration.
 
-For the configured free-tier deployment, follow **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. Render uses Turso and authenticated Cloudinary storage, Google sign-in, production mode, and the exact Vercel origin. The Vercel API proxy preserves same-origin session cookies. Missing cloud credentials cause startup to fail on Render instead of storing student data on its temporary filesystem. Provider accounts and live services still need to be configured in their dashboards.
+For the configured free-tier deployment, follow **[docs/VERCEL-BACKEND.md](docs/VERCEL-BACKEND.md)**. Vercel builds from the repository root and runs the API directly on the website origin, preserving session cookies. Missing Turso or Cloudinary credentials fail startup instead of storing student data on temporary disks. Private queues process unread emails, and a daily cron schedules opted-in product reminders. The former Render setup remains documented for rollback.
 
 ## Tests
 

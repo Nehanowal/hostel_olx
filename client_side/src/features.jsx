@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { preparePhoto } from "./preparePhoto";
 import {
   MapPin,
   MessageCircle,
@@ -346,10 +347,8 @@ export function ListingForm({ config, item, onSave }) {
     setError("");
     for (const file of files) {
       try {
-        if (file.size > 8 * 1024 * 1024)
-          throw new Error(`${file.name} is over 8 MB.`);
         const data = new FormData();
-        data.append("photo", file);
+        data.append("photo", await preparePhoto(file));
         const image = await api("/images", { method: "POST", body: data });
         setImages((current) => [...current, image]);
       } catch (e) {

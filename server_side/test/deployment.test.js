@@ -367,7 +367,7 @@ test("Render cannot silently fall back to temporary photo storage", () => {
 test("Render and partial Turso credentials cannot fall back to local SQLite", async () => {
   await assert.rejects(
     openDatabase(undefined, { RENDER: "true" }),
-    /Render requires TURSO/,
+    /Hosted deployments require TURSO/,
   );
   await assert.rejects(
     openDatabase(undefined, {

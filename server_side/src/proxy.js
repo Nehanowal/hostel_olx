@@ -5,6 +5,19 @@ import { ipKeyGenerator } from "express-rate-limit";
 const hash = (value) => createHash("sha256").update(value).digest();
 
 export function configureProxy(app, env = process.env) {
+  if (env.VERCEL === "1") {
+    // The API shares the website's Vercel project. Trust only Vercel's
+    // overwritten platform header, never an arbitrary X-Forwarded-For.
+    app.set("trust proxy", 1);
+    app.use("/api", (req, res, next) => {
+      if (req.path === "/health") return next();
+      const clientIp = req.get("x-vercel-forwarded-for");
+      if (!isIP(clientIp || "")) return res.status(400).json({ error: "Invalid client address." });
+      req.clientIp = clientIp;
+      next();
+    });
+    return;
+  }
   const secret = env.API_PROXY_SECRET;
   if ((secret && secret.length < 32) || (env.RENDER === "true" && !secret))
     throw new Error(

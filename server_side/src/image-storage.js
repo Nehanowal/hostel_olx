@@ -19,9 +19,9 @@ export function createImageStorage({
       "Set all three CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET values.",
     );
   const remote = configured === 3;
-  if (!remote && env.RENDER === "true")
+  if (!remote && (env.RENDER === "true" || env.VERCEL === "1"))
     throw new Error(
-      "Cloudinary is required on Render; uploaded photos cannot use its temporary filesystem.",
+      "Cloudinary is required on hosted deployments; uploaded photos cannot use a temporary filesystem.",
     );
   if (!remote) mkdirSync(uploads, { recursive: true });
   const options = {

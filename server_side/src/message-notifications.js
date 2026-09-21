@@ -187,11 +187,11 @@ export function createMessageNotifications({
       };
     });
   }
-  async function drain() {
+  async function drain({ limit = 10 } = {}) {
     if (!mailer || running) return;
     running = true;
     try {
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < limit; i++) {
         const job = await claim();
         if (!job) break;
         if (job.skipped) continue;

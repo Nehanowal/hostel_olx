@@ -1,0 +1,36 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci --prefix server_side --omit=dev && npm ci --prefix client_side --include=dev",
+  "buildCommand": "npm run build --prefix client_side",
+  "outputDirectory": "client_side/dist",
+  "regions": ["bom1"],
+  "functions": {
+    "api/index.mjs": { "maxDuration": 60, "includeFiles": "server_side/src/schema.sql" },
+    "api/daily.mjs": { "maxDuration": 60, "includeFiles": "server_side/src/schema.sql" },
+    "api/jobs.mjs": {
+      "maxDuration": 300,
+      "includeFiles": "server_side/src/schema.sql",
+      "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "marketplace-jobs" }]
+    }
+  },
+  "crons": [{ "path": "/cron/daily", "schedule": "0 4 * * *" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; frame-src 'self' https://accounts.google.com/gsi/; connect-src 'self' https://accounts.google.com/gsi/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://images.unsplash.com https://api.cloudinary.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" }
+      ]
+    },
+    { "source": "/api/:path*", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }
+  ],
+  "rewrites": [
+    { "source": "/cron/daily", "destination": "/api/daily" },
+    { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/((?!(?:api|cron)(?:/|$)).*)", "destination": "/index.html" }
+  ]
+}
