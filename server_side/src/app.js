@@ -344,7 +344,7 @@ export async function createApp(options = {}) {
   });
   const conversation = async (id, user) => {
     const c = await get(
-      "SELECT c.*,l.title,l.status AS listing_status,l.price,l.university,l.is_demo FROM conversations c JOIN listings l ON l.id=c.listing_id WHERE c.id=? AND (c.buyer_id=? OR c.seller_id=?) AND l.university=?",
+      "SELECT c.*,l.title,l.status AS listing_status,l.price,l.university,l.is_demo FROM conversations c JOIN listings l ON l.id=c.listing_id WHERE c.id=? AND (c.buyer_id=? OR (c.seller_id=? AND EXISTS(SELECT 1 FROM messages m WHERE m.conversation_id=c.id))) AND l.university=?",
       id,
       user.id,
       user.id,
@@ -906,7 +906,7 @@ export async function createApp(options = {}) {
   );
   app.get("/api/conversations", auth, async (req, res) => {
     const rows = await all(
-      "SELECT c.*,l.title,l.price,l.status AS listing_status FROM conversations c JOIN listings l ON l.id=c.listing_id WHERE (c.buyer_id=? OR c.seller_id=?) AND l.university=? ORDER BY c.updated_at DESC",
+      "SELECT c.*,l.title,l.price,l.status AS listing_status FROM conversations c JOIN listings l ON l.id=c.listing_id WHERE (c.buyer_id=? OR (c.seller_id=? AND EXISTS(SELECT 1 FROM messages m WHERE m.conversation_id=c.id))) AND l.university=? ORDER BY c.updated_at DESC",
       req.user.id,
       req.user.id,
       req.user.university,
@@ -925,7 +925,7 @@ export async function createApp(options = {}) {
                 "SELECT body FROM messages WHERE conversation_id=? ORDER BY id DESC LIMIT 1",
                 c.id,
               )
-            )?.body || "Start the conversation",
+            )?.body || "Draft — not sent",
           unread: (
             await get(
               "SELECT count(*) AS n FROM messages WHERE conversation_id=? AND sender_id<>? AND id>coalesce((SELECT last_id FROM conversation_reads WHERE conversation_id=? AND user_id=?),0)",

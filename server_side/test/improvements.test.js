@@ -726,3 +726,23 @@ test('All finds recommends non-fashion before fashion across pages while explici
  assert.equal((await request('/listings?sort=popular',{cookie:buyer.cookie})).body.items[0].id,fashion);
  assert.deepEqual((await request('/listings?category=Fashion',{cookie:buyer.cookie})).body.items.map(x=>x.id),[fashion]);
 });
+
+test('opening a message composer stays private until the buyer actually sends a valid message',async t=>{
+ const {db,request,login}=await fixture(t);const seller=await login('Seller');const buyer=await login('Buyer');const outsider=await login('Outsider');
+ const id=randomUUID();await db.prepare('INSERT INTO listings(id,seller_id,university,title,description,category,price,condition,location) VALUES (?,?,?,?,?,?,?,?,?)').run(id,seller.body.user.id,seller.body.user.university,'Desk lamp','A useful lamp','Other',10000,'Good','Campus');
+ const draft=await request(`/listings/${id}/conversations`,{method:'POST',cookie:buyer.cookie});assert.equal(draft.status,201);const chat=draft.body.id;
+ assert.deepEqual((await request('/conversations',{cookie:seller.cookie})).body,[]);
+ assert.equal((await request('/conversations',{cookie:buyer.cookie})).body[0].lastMessage,'Draft — not sent');
+ assert.equal((await request(`/conversations/${chat}/messages`,{cookie:buyer.cookie})).status,200);
+ assert.equal((await request(`/conversations/${chat}/messages`,{cookie:seller.cookie})).status,404);
+ assert.equal((await request(`/conversations/${chat}/messages`,{cookie:outsider.cookie})).status,404);
+ assert.equal((await request(`/conversations/${chat}/read`,{cookie:seller.cookie,method:'POST',body:{lastId:0}})).status,404);
+ assert.equal((await request(`/conversations/${chat}/messages`,{cookie:seller.cookie,method:'POST',body:{body:'Hello',clientId:randomUUID()}})).status,404);
+ assert.equal((await request(`/conversations/${chat}/messages`,{cookie:buyer.cookie,method:'POST',body:{body:' ',clientId:randomUUID()}})).status,422);
+ assert.deepEqual((await request('/conversations',{cookie:seller.cookie})).body,[]);
+ assert.equal((await db.prepare('SELECT count(*) n FROM message_email_outbox WHERE conversation_id=?').get(chat)).n,0);
+ const body={body:'Hi! Is this still available?',clientId:randomUUID()};await request(`/conversations/${chat}/messages`,{cookie:buyer.cookie,method:'POST',body});await request(`/conversations/${chat}/messages`,{cookie:buyer.cookie,method:'POST',body});
+ const inbox=(await request('/conversations',{cookie:seller.cookie})).body;assert.equal(inbox.length,1);assert.equal(inbox[0].lastMessage,body.body);assert.equal(inbox[0].unread,1);
+ assert.equal((await request(`/conversations/${chat}/messages`,{cookie:seller.cookie})).body.messages.length,1);
+ assert.equal((await request(`/conversations/${chat}/messages`,{cookie:seller.cookie,method:'POST',body:{body:'Yes it is',clientId:randomUUID()}})).status,201);
+});

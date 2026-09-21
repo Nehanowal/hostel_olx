@@ -68,6 +68,9 @@ async function fixture(t, options = {}) {
       "INSERT INTO conversations(id,listing_id,buyer_id,seller_id) VALUES (?,?,?,?)",
     )
     .run(conversation, listing, users.buyer.id, users.seller.id);
+  // Reply notifications exercise an established conversation with an already-read opening message.
+  const opening = await db.prepare("INSERT INTO messages(conversation_id,sender_id,client_id,body) VALUES (?,?,?,?) RETURNING id").get(conversation,users.buyer.id,randomUUID(),"Earlier message");
+  await db.prepare("INSERT INTO conversation_reads(conversation_id,user_id,last_id) VALUES (?,?,?)").run(conversation,users.seller.id,opening.id);
   const { app, notifications } = await createApp({
     db,
     seed: false,

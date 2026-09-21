@@ -866,7 +866,7 @@ export function Inbox({
                   <div className="chat-start">
                     <span className="avatar large">{data.other.name[0]}</span>
                     <h3>Say hello to {data.other.name.split(" ")[0]}.</h3>
-                    <p>Ask about the item and agree on a safe pickup spot.</p>
+                    <p>The seller will only see this conversation after you press Send.</p>
                     <button
                       className="quick-message"
                       onClick={() => setDraft("Hi! Is this still available?")}
