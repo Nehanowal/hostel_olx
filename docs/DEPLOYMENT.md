@@ -21,6 +21,10 @@ The existing Google OAuth web client now authorizes `https://hostel-olx.vercel.a
 
 Use the existing services for subsequent deployments; do not repeat account or database creation. Push changes to `main` to trigger the connected deployments. Keep the shared proxy secret synchronized between Render and Vercel.
 
+### Temporary connection failures
+
+Render Free services sleep after 15 minutes without inbound traffic and may take about a minute to wake up ([Render documentation](https://render.com/docs/free#spinning-down-on-idle)). The sign-in/session startup now retries transient network, gateway, and non-JSON wake-up responses for up to 90 seconds. Each attempt times out after 20 seconds, and retries wait four seconds. The page explains a slow connection while waiting and offers **Try again** if it still cannot connect. Access errors are not retried, and message sends and other writes are never automatically resubmitted. This handles temporary startup failures; it cannot remove free-tier sleeping or repair a sustained outage.
+
 ## Architecture
 
 | Component | Provider | What goes there |

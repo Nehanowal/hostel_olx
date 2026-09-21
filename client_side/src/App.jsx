@@ -26,6 +26,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { api, money } from "./api";
+import { loadMarketplace } from "./startup";
 import {
   ListingDetail,
   ListingForm,
@@ -218,6 +219,7 @@ function MarketplaceApp() {
   const [config, setConfig] = useState(null),
     [user, setUser] = useState(null),
     [bootError, setBootError] = useState(""),
+    [bootSlow, setBootSlow] = useState(false),
     [ready, setReady] = useState(false);
   useEffect(() => {
     if (!user) return;
@@ -288,14 +290,22 @@ function MarketplaceApp() {
     };
   }, [user?.id]);
   useEffect(() => {
-    Promise.all([api("/config"), api("/me")])
+    const controller = new AbortController();
+    const slowTimer = setTimeout(() => setBootSlow(true), 8000);
+    loadMarketplace({ signal: controller.signal, onRetry: () => setBootSlow(true) })
       .then(([c, m]) => {
+        if (controller.signal.aborted) return;
         setConfig(c);
         setUser(m.user);
         applyEmailLink(m.user);
         setReady(true);
       })
-      .catch((e) => setBootError(e.message));
+      .catch((e) => { if (!controller.signal.aborted) setBootError(e.message); })
+      .finally(() => clearTimeout(slowTimer));
+    return () => {
+      clearTimeout(slowTimer);
+      controller.abort();
+    };
   }, [applyEmailLink]);
   useEffect(() => {
     if (!toast) return;
@@ -380,9 +390,10 @@ function MarketplaceApp() {
     );
   if (!ready)
     return (
-      <div className="loading-page">
+      <div className="loading-page" role="status" aria-live="polite">
         <div className="brand-mark" aria-label="Final Price?">?</div>
-        <p>Opening your campus marketplace…</p>
+        <p>{bootSlow ? "Connecting to your campus marketplace…" : "Opening your campus marketplace…"}</p>
+        {bootSlow && <p>The server may be waking up. We’ll keep trying for a little longer.</p>}
       </div>
     );
   return (

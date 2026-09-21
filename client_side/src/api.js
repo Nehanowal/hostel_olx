@@ -15,11 +15,15 @@ export async function api(path, options = {}) {
       : undefined,
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok || data === null)
-    throw new Error(
+  if (!response.ok || data === null) {
+    const error = new Error(
       data?.error ||
         "The marketplace is unavailable or waking up. Wait a minute and try again.",
     );
+    error.retryable = response.status === 408 || response.status >= 500 ||
+      (response.ok && data === null);
+    throw error;
+  }
   return data;
 }
 export const money = (value) =>
